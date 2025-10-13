@@ -49,7 +49,7 @@ class ApiClient {
 
       return data;
     } catch (error) {
-      console.error(`❌ API Error for ${url}:`, error); // Enhanced error logging
+      //console.error(`❌ API Error for ${url}:`, error); // Enhanced error logging
       throw error;    }
   }
 
@@ -236,6 +236,64 @@ class ApiClient {
 
   async getDashboardStats() {
     return this.request('/users/dashboard-stats');
+  }
+
+  // Community APIs
+  async getCommunityPosts(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const endpoint = queryString ? `/community/posts?${queryString}` : '/community/posts';
+    return this.request(endpoint);
+  }
+
+  async createCommunityPost(postData) {
+    return this.request('/community/posts', {
+      method: 'POST',
+      body: postData
+    });
+  }
+
+  async likePost(postId) {
+    return this.request(`/community/posts/${postId}/like`, {
+      method: 'PUT'
+    });
+  }
+
+  async addComment(postId, commentData) {
+    return this.request(`/community/posts/${postId}/comments`, {
+      method: 'POST',
+      body: commentData
+    });
+  }
+
+  // Generic HTTP methods for flexibility
+  async get(endpoint, options = {}) {
+    return this.request(endpoint, {
+      method: 'GET',
+      ...options
+    });
+  }
+
+  async post(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: data,
+      ...options
+    });
+  }
+
+  async put(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: data,
+      ...options
+    });
+  }
+
+  async delete(endpoint, options = {}) {
+    return this.request(endpoint, {
+      method: 'DELETE',
+      ...options
+    });
   }
 }
 
