@@ -25,62 +25,10 @@ export default function CommunityScreen() {
   const [showNewPostModal, setShowNewPostModal] = useState(false);
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
-
-  // Sample community posts - replace with API calls
-  const samplePosts = [
-    {
-      _id: '1',
-      title: 'Sleep training tips for 6-month-old',
-      content: 'My baby is 6 months old and still waking up multiple times during the night. Any advice on gentle sleep training methods?',
-      author: {
-        name: 'Sarah M.',
-        initials: 'SM'
-      },
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      replies: 12,
-      likes: 8,
-      category: 'Sleep'
-    },
-    {
-      _id: '2',
-      title: 'Introducing solid foods - need advice',
-      content: 'When did you start introducing solid foods to your baby? My pediatrician says 6 months but some friends say earlier is okay.',
-      author: {
-        name: 'Mike D.',
-        initials: 'MD'
-      },
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
-      replies: 18,
-      likes: 15,
-      category: 'Feeding'
-    },
-    {
-      _id: '3',
-      title: 'Baby monitor recommendations',
-      content: 'Looking for a reliable baby monitor with video. What are your favorites and why?',
-      author: {
-        name: 'Jennifer L.',
-        initials: 'JL'
-      },
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
-      replies: 7,
-      likes: 12,
-      category: 'Equipment'
-    },
-    {
-      _id: '4',
-      title: 'First time parent anxiety',
-      content: 'Is it normal to feel overwhelmed as a first-time parent? Sometimes I worry about every little thing my baby does.',
-      author: {
-        name: 'Alex R.',
-        initials: 'AR'
-      },
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
-      replies: 25,
-      likes: 32,
-      category: 'Support'
-    },
-  ];
+  const [newPostCategory, setNewPostCategory] = useState('General');
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [newComment, setNewComment] = useState('');
 
   useEffect(() => {
     loadPosts();
@@ -89,10 +37,11 @@ export default function CommunityScreen() {
   const loadPosts = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await apiClient.getCommunityPosts();
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      setPosts(samplePosts);
+      const response = await apiClient.getCommunityPosts({ limit: 50 });
+      
+      if (response.success && response.data) {
+        setPosts(response.data.posts || []);
+      }
     } catch (error) {
       console.error('Failed to load posts:', error);
       Alert.alert('Error', 'Failed to load community posts');
@@ -114,46 +63,77 @@ export default function CommunityScreen() {
     }
 
     try {
-      // TODO: Replace with actual API call
-      const newPost = {
-        _id: Date.now().toString(),
-        title: newPostTitle,
-        content: newPostContent,
-        author: {
-          name: 'You',
-          initials: 'YO'
-        },
-        timestamp: new Date(),
-        replies: 0,
-        likes: 0,
-        category: 'General'
+      const postData = {
+        title: newPostTitle.trim(),
+        content: newPostContent.trim(),
+        category: newPostCategory
       };
 
-      setPosts([newPost, ...posts]);
-      setNewPostTitle('');
-      setNewPostContent('');
-      setShowNewPostModal(false);
-      Alert.alert('Success', 'Your post has been created!');
+      const response = await apiClient.createCommunityPost(postData);
+      
+      if (response.success) {
+        Alert.alert('Success', 'Your post has been created!');
+        setNewPostTitle('');
+        setNewPostContent('');
+        setNewPostCategory('General');
+        setShowNewPostModal(false);
+        await loadPosts(); // Reload posts
+      }
     } catch (error) {
       console.error('Failed to create post:', error);
-      Alert.alert('Error', 'Failed to create post');
+      Alert.alert('Error', error.message || 'Failed to create post');
     }
   };
 
   const handleLikePost = async (postId) => {
     try {
-      const updatedPosts = posts.map(post => {
-        if (post._id === postId) {
-          return { ...post, likes: post.likes + 1 };
-        }
-        return post;
-      });
-      setPosts(updatedPosts);
+      const response = await apiClient.likePost(postId);
       
-      // TODO: Update on backend
-      // await apiClient.likePost(postId);
+      if (response.success) {
+        // Update the post in local state
+        setPosts(prevPosts => prevPosts.map(post => {
+          if (post.id === postId || post._id === postId) {
+            return {
+              ...post,
+              likeCount: response.data.likeCount,
+              userLiked: response.data.action === 'liked'
+            };
+          }
+          return post;
+        }));
+      }
     } catch (error) {
       console.error('Failed to like post:', error);
+      Alert.alert('Error', 'Failed to update like');
+    }
+  };
+
+  const handleCommentPost = (post) => {
+    setSelectedPost(post);
+    setShowCommentModal(true);
+  };
+
+  const handleSubmitComment = async () => {
+    if (!newComment.trim()) {
+      Alert.alert('Error', 'Please enter a comment');
+      return;
+    }
+
+    try {
+      const postId = selectedPost.id || selectedPost._id;
+      const response = await apiClient.addComment(postId, {
+        content: newComment.trim()
+      });
+      
+      if (response.success) {
+        Alert.alert('Success', 'Comment added successfully!');
+        setNewComment('');
+        setShowCommentModal(false);
+        await loadPosts(); // Reload posts to get updated comment count
+      }
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+      Alert.alert('Error', error.message || 'Failed to add comment');
     }
   };
 
@@ -180,54 +160,70 @@ export default function CommunityScreen() {
     }
   };
 
-  const renderPostItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.postCard}
-      onPress={() => {
-        // TODO: Navigate to post detail screen
-        Alert.alert('Post Detail', `Open detailed view for: ${item.title}`);
-      }}
-    >
-      <View style={styles.postHeader}>
-        <View style={styles.authorInfo}>
-          <View style={styles.authorAvatar}>
-            <Text style={styles.authorInitials}>{item.author.initials}</Text>
+  const renderPostItem = ({ item }) => {
+    const postId = item.id || item._id;
+    const authorName = item.author 
+      ? `${item.author.firstName || ''} ${item.author.lastName || ''}`.trim() 
+      : 'Anonymous';
+    const authorInitials = item.author 
+      ? `${item.author.firstName?.[0] || ''}${item.author.lastName?.[0] || ''}`.toUpperCase()
+      : 'AN';
+    
+    return (
+      <TouchableOpacity
+        style={styles.postCard}
+        onPress={() => {
+          Alert.alert('Post Detail', `Open detailed view for: ${item.title}`);
+        }}
+      >
+        <View style={styles.postHeader}>
+          <View style={styles.authorInfo}>
+            <View style={styles.authorAvatar}>
+              <Text style={styles.authorInitials}>{authorInitials}</Text>
+            </View>
+            <View style={styles.postMeta}>
+              <Text style={styles.authorName}>{authorName}</Text>
+              <Text style={styles.postTime}>{formatTimestamp(item.createdAt || item.timestamp)}</Text>
+            </View>
           </View>
-          <View style={styles.postMeta}>
-            <Text style={styles.authorName}>{item.author.name}</Text>
-            <Text style={styles.postTime}>{formatTimestamp(item.timestamp)}</Text>
+          <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.category) }]}>
+            <Text style={styles.categoryText}>{item.category}</Text>
           </View>
         </View>
-        <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.category) }]}>
-          <Text style={styles.categoryText}>{item.category}</Text>
+
+        <Text style={styles.postTitle}>{item.title}</Text>
+        <Text style={styles.postContent} numberOfLines={3}>
+          {item.content}
+        </Text>
+
+        <View style={styles.postActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleLikePost(postId)}
+          >
+            <Ionicons 
+              name={item.userLiked ? "heart" : "heart-outline"} 
+              size={18} 
+              color={item.userLiked ? "#e74c3c" : "#666"} 
+            />
+            <Text style={styles.actionText}>{item.likeCount || item.likes || 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleCommentPost(item)}
+          >
+            <Ionicons name="chatbubble-outline" size={18} color="#666" />
+            <Text style={styles.actionText}>{item.commentCount || item.replies || 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton}>
+            <Ionicons name="share-outline" size={18} color="#666" />
+          </TouchableOpacity>
         </View>
-      </View>
-
-      <Text style={styles.postTitle}>{item.title}</Text>
-      <Text style={styles.postContent} numberOfLines={3}>
-        {item.content}
-      </Text>
-
-      <View style={styles.postActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleLikePost(item._id)}
-        >
-          <Ionicons name="heart-outline" size={18} color="#666" />
-          <Text style={styles.actionText}>{item.likes}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="chatbubble-outline" size={18} color="#666" />
-          <Text style={styles.actionText}>{item.replies}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="share-outline" size={18} color="#666" />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -304,6 +300,29 @@ export default function CommunityScreen() {
               maxLength={100}
             />
             
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Category:</Text>
+              <View style={styles.categoryPicker}>
+                {['General', 'Sleep', 'Feeding', 'Health', 'Development', 'Safety', 'Products', 'Tips'].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.categoryOption,
+                      newPostCategory === cat && styles.categoryOptionSelected
+                    ]}
+                    onPress={() => setNewPostCategory(cat)}
+                  >
+                    <Text style={[
+                      styles.categoryOptionText,
+                      newPostCategory === cat && styles.categoryOptionTextSelected
+                    ]}>
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            
             <TextInput
               style={styles.contentInput}
               placeholder="What's on your mind?"
@@ -316,6 +335,56 @@ export default function CommunityScreen() {
             
             <Text style={styles.characterCount}>
               {newPostContent.length}/500 characters
+            </Text>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Comment Modal */}
+      <Modal
+        visible={showCommentModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowCommentModal(false);
+                setNewComment('');
+              }}
+            >
+              <Text style={styles.cancelButton}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Add Comment</Text>
+            <TouchableOpacity onPress={handleSubmitComment}>
+              <Text style={styles.postButton}>Post</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            {selectedPost && (
+              <View style={styles.postPreview}>
+                <Text style={styles.postPreviewTitle}>{selectedPost.title}</Text>
+                <Text style={styles.postPreviewContent} numberOfLines={2}>
+                  {selectedPost.content}
+                </Text>
+              </View>
+            )}
+            
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Write your comment..."
+              value={newComment}
+              onChangeText={setNewComment}
+              multiline
+              maxLength={1000}
+              textAlignVertical="top"
+              autoFocus
+            />
+            
+            <Text style={styles.characterCount}>
+              {newComment.length}/1000 characters
             </Text>
           </View>
         </SafeAreaView>
@@ -489,12 +558,73 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
     marginBottom: 16,
   },
+  pickerContainer: {
+    marginBottom: 16,
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  categoryPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f8f8f8',
+  },
+  categoryOptionSelected: {
+    backgroundColor: '#6a1b9a',
+    borderColor: '#6a1b9a',
+  },
+  categoryOptionText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  categoryOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
   contentInput: {
     flex: 1,
     fontSize: 16,
     color: '#333',
     textAlignVertical: 'top',
     padding: 0,
+  },
+  commentInput: {
+    minHeight: 120,
+    fontSize: 16,
+    color: '#333',
+    textAlignVertical: 'top',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    backgroundColor: '#f8f8f8',
+  },
+  postPreview: {
+    padding: 12,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  postPreviewTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  postPreviewContent: {
+    fontSize: 12,
+    color: '#666',
   },
   characterCount: {
     fontSize: 12,
