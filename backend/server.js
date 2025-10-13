@@ -108,8 +108,8 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/babies', authMiddleware, babyRoutes);
+app.use('/api/community', authMiddleware, communityRoutes);
 // app.use('/api/monitoring', authMiddleware, monitoringRoutes);
-// app.use('/api/community', authMiddleware, communityRoutes);
 // app.use('/api/detections', authMiddleware, detectionsRoutes);
 // app.use('/api/routines', authMiddleware, routineRoutes);
 
