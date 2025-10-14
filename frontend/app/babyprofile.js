@@ -42,24 +42,130 @@ export default function BabyProfileScreen() {
     return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
   };
 
-  // Validate form data
+  // Parse backend error messages into user-friendly format
+  const parseErrorMessage = (message) => {
+    if (!message) return 'Something went wrong. Please try again.';
+
+    // Remove quotes and clean up the message
+    let cleanMessage = message.replace(/"/g, '');
+
+    // Handle specific validation errors
+    if (cleanMessage.includes('height') && cleanMessage.includes('must be greater than or equal to 20')) {
+      return 'Height must be at least 20 cm. Please enter a valid height.';
+    }
+    
+    if (cleanMessage.includes('height') && cleanMessage.includes('must be less than or equal to 150')) {
+      return 'Height must be less than 150 cm. Please enter a valid height.';
+    }
+
+    if (cleanMessage.includes('weight') && cleanMessage.includes('must be greater than or equal to')) {
+      return 'Weight must be at least 0.5 kg. Please enter a valid weight.';
+    }
+    
+    if (cleanMessage.includes('weight') && cleanMessage.includes('must be less than or equal to 30')) {
+      return 'Weight must be less than 30 kg. Please enter a valid weight.';
+    }
+
+    if (cleanMessage.includes('name') && cleanMessage.includes('is required')) {
+      return 'Baby name is required. Please enter a name.';
+    }
+
+    if (cleanMessage.includes('dateOfBirth') && cleanMessage.includes('must be less than or equal to')) {
+      return 'Date of birth cannot be in the future. Please select a valid date.';
+    }
+
+    if (cleanMessage.includes('feedingSettings.feedingType') && cleanMessage.includes('is required')) {
+      return 'Please select a feeding type for your baby.';
+    }
+
+    if (cleanMessage.includes('gender') && cleanMessage.includes('is required')) {
+      return 'Please select your baby\'s gender.';
+    }
+
+    // Handle network errors
+    if (cleanMessage.includes('Network request failed') || cleanMessage.includes('Failed to fetch')) {
+      return 'Unable to connect to server. Please check your internet connection and try again.';
+    }
+
+    // Return cleaned message or default
+    return cleanMessage || 'Something went wrong. Please try again.';
+  };
+
+  // Validate form data with user-friendly messages
   const validateForm = () => {
+    // Name validation
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your baby\'s name');
+      Alert.alert('Name Required', 'Please enter your baby\'s name');
       return false;
     }
-    if (!height.trim() || isNaN(parseFloat(height))) {
-      Alert.alert('Error', 'Please enter a valid height in cm');
+    
+    if (name.trim().length > 100) {
+      Alert.alert('Name Too Long', 'Baby name must be less than 100 characters');
       return false;
     }
-    if (!weight.trim() || isNaN(parseFloat(weight))) {
-      Alert.alert('Error', 'Please enter a valid weight in kg');
-      return false;
-    }
+
+    // Date of Birth validation
     if (dob > new Date()) {
-      Alert.alert('Error', 'Date of birth cannot be in the future');
+      Alert.alert('Invalid Date', 'Date of birth cannot be in the future. Please select a valid date.');
       return false;
     }
+
+    const babyAge = (new Date() - dob) / (1000 * 60 * 60 * 24 * 365); // Age in years
+    if (babyAge > 10) {
+      Alert.alert('Age Limit', 'This app is designed for babies and young children up to 10 years old.');
+      return false;
+    }
+
+    // Height validation
+    if (!height.trim()) {
+      Alert.alert('Height Required', 'Please enter your baby\'s height in centimeters (cm)');
+      return false;
+    }
+    
+    const heightValue = parseFloat(height);
+    if (isNaN(heightValue)) {
+      Alert.alert('Invalid Height', 'Please enter a valid number for height');
+      return false;
+    }
+    
+    if (heightValue < 20) {
+      Alert.alert('Height Too Low', 'Height must be at least 20 cm. Please check and enter the correct height.');
+      return false;
+    }
+    
+    if (heightValue > 150) {
+      Alert.alert('Height Too High', 'Height must be less than 150 cm. Please check and enter the correct height.');
+      return false;
+    }
+
+    // Weight validation
+    if (!weight.trim()) {
+      Alert.alert('Weight Required', 'Please enter your baby\'s weight in kilograms (kg)');
+      return false;
+    }
+    
+    const weightValue = parseFloat(weight);
+    if (isNaN(weightValue)) {
+      Alert.alert('Invalid Weight', 'Please enter a valid number for weight');
+      return false;
+    }
+    
+    if (weightValue < 0.5) {
+      Alert.alert('Weight Too Low', 'Weight must be at least 0.5 kg. Please check and enter the correct weight.');
+      return false;
+    }
+    
+    if (weightValue > 30) {
+      Alert.alert('Weight Too High', 'Weight must be less than 30 kg. Please check and enter the correct weight.');
+      return false;
+    }
+
+    // Feeding type validation
+    if (!feedingType) {
+      Alert.alert('Feeding Type Required', 'Please select a feeding type for your baby');
+      return false;
+    }
+
     return true;
   };
   // Save baby profile and navigate to Dashboard
@@ -94,10 +200,14 @@ export default function BabyProfileScreen() {
           ]
         );
       } else {
-        Alert.alert('Error', response.message || 'Failed to create baby profile');
+        // Show user-friendly error message
+        const errorMessage = parseErrorMessage(response.message);
+        Alert.alert('Unable to Create Profile', errorMessage);
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      // Show user-friendly error message
+      const errorMessage = parseErrorMessage(error.message);
+      Alert.alert('Unable to Create Profile', errorMessage);
       console.error('Create baby profile error:', error);
     } finally {
       setLoading(false);
@@ -142,10 +252,14 @@ export default function BabyProfileScreen() {
           ]
         );
       } else {
-        Alert.alert('Error', response.message || 'Failed to create baby profile');
+        // Show user-friendly error message
+        const errorMessage = parseErrorMessage(response.message);
+        Alert.alert('Unable to Create Profile', errorMessage);
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      // Show user-friendly error message
+      const errorMessage = parseErrorMessage(error.message);
+      Alert.alert('Unable to Create Profile', errorMessage);
       console.error('Create baby profile error:', error);
     } finally {
       setLoading(false);
