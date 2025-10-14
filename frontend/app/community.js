@@ -11,7 +11,10 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
-  Modal
+  Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +32,8 @@ export default function CommunityScreen() {
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [newComment, setNewComment] = useState('');
+  const [showPostDetailModal, setShowPostDetailModal] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
 
   useEffect(() => {
     loadPosts();
@@ -54,6 +59,19 @@ export default function CommunityScreen() {
     setRefreshing(true);
     await loadPosts();
     setRefreshing(false);
+  };
+
+  const loadPostDetails = async (postId) => {
+    try {
+      const response = await apiClient.getPostDetails(postId);
+      
+      if (response.success && response.data && response.data.post) {
+        setSelectedPost(response.data.post);
+      }
+    } catch (error) {
+      console.error('Failed to load post details:', error);
+      Alert.alert('Error', 'Failed to load post details');
+    }
   };
 
   const handleCreatePost = async () => {
@@ -110,7 +128,8 @@ export default function CommunityScreen() {
 
   const handleCommentPost = (post) => {
     setSelectedPost(post);
-    setShowCommentModal(true);
+    setShowPostDetailModal(true);
+    loadPostDetails(post._id || post.id);
   };
 
   const handleSubmitComment = async () => {
@@ -120,21 +139,62 @@ export default function CommunityScreen() {
     }
 
     try {
-      const postId = selectedPost.id || selectedPost._id;
-      const response = await apiClient.addComment(postId, {
-        content: newComment.trim()
-      });
+      const postId = selectedPost._id || selectedPost.id;
       
-      if (response.success) {
-        Alert.alert('Success', 'Comment added successfully!');
-        setNewComment('');
-        setShowCommentModal(false);
-        await loadPosts(); // Reload posts to get updated comment count
+      if (replyingTo) {
+        // Submit reply to comment
+        const response = await apiClient.replyToComment(postId, replyingTo._id, {
+          content: newComment.trim()
+        });
+        
+        if (response.success) {
+          setNewComment('');
+          setReplyingTo(null);
+          await loadPostDetails(postId);
+        }
+      } else {
+        // Submit new comment
+        const response = await apiClient.addComment(postId, {
+          content: newComment.trim()
+        });
+        
+        if (response.success) {
+          setNewComment('');
+          await loadPostDetails(postId);
+          // Update comment count in posts list
+          setPosts(prevPosts => prevPosts.map(post => {
+            if ((post._id || post.id) === postId) {
+              return { ...post, commentCount: (post.commentCount || 0) + 1 };
+            }
+            return post;
+          }));
+        }
       }
     } catch (error) {
       console.error('Failed to add comment:', error);
       Alert.alert('Error', error.message || 'Failed to add comment');
     }
+  };
+
+  const handleLikeComment = async (commentId) => {
+    try {
+      const postId = selectedPost._id || selectedPost.id;
+      const response = await apiClient.likeComment(postId, commentId);
+      
+      if (response.success) {
+        await loadPostDetails(postId);
+      }
+    } catch (error) {
+      console.error('Failed to like comment:', error);
+      Alert.alert('Error', 'Failed to update like');
+    }
+  };
+
+  const handleReplyToComment = (comment) => {
+    const authorName = comment.author 
+      ? `${comment.author.firstName || ''} ${comment.author.lastName || ''}`.trim() 
+      : 'Anonymous';
+    setReplyingTo({ ...comment, authorName });
   };
 
   const getCategoryColor = (category) => {
@@ -172,9 +232,8 @@ export default function CommunityScreen() {
     return (
       <TouchableOpacity
         style={styles.postCard}
-        onPress={() => {
-          Alert.alert('Post Detail', `Open detailed view for: ${item.title}`);
-        }}
+        onPress={() => handleCommentPost(item)}
+        activeOpacity={0.7}
       >
         <View style={styles.postHeader}>
           <View style={styles.authorInfo}>
@@ -340,7 +399,208 @@ export default function CommunityScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Comment Modal */}
+      {/* Post Detail Modal */}
+      <Modal
+        visible={showPostDetailModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => {
+              setShowPostDetailModal(false);
+              setReplyingTo(null);
+              setNewComment('');
+            }}>
+              <Ionicons name="close" size={28} color="#512da8" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Post</Text>
+            <View style={{ width: 28 }} />
+          </View>
+
+          {selectedPost ? (
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ flex: 1 }}
+              keyboardVerticalOffset={100}
+            >
+              <ScrollView style={styles.postDetailContent}>
+                {/* Post Header */}
+                <View style={styles.postDetailHeader}>
+                  <View style={styles.authorInfo}>
+                    <View style={styles.authorAvatar}>
+                      <Text style={styles.authorInitials}>
+                        {selectedPost.author 
+                          ? `${selectedPost.author.firstName?.[0] || ''}${selectedPost.author.lastName?.[0] || ''}`.toUpperCase()
+                          : 'AN'}
+                      </Text>
+                    </View>
+                    <View style={styles.postMeta}>
+                      <Text style={styles.authorName}>
+                        {selectedPost.author 
+                          ? `${selectedPost.author.firstName || ''} ${selectedPost.author.lastName || ''}`.trim() 
+                          : 'Anonymous'}
+                      </Text>
+                      <Text style={styles.postTime}>{formatTimestamp(selectedPost.createdAt)}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(selectedPost.category) }]}>
+                    <Text style={styles.categoryText}>{selectedPost.category}</Text>
+                  </View>
+                </View>
+
+                {/* Post Content */}
+                <Text style={styles.postDetailTitle}>{selectedPost.title}</Text>
+                <Text style={styles.postDetailText}>{selectedPost.content}</Text>
+
+                {/* Post Actions */}
+                <View style={styles.postDetailActions}>
+                  <TouchableOpacity
+                    style={styles.postDetailActionButton}
+                    onPress={() => handleLikePost(selectedPost._id || selectedPost.id)}
+                  >
+                    <Ionicons 
+                      name={selectedPost.userLiked ? "heart" : "heart-outline"} 
+                      size={24} 
+                      color={selectedPost.userLiked ? "#e74c3c" : "#666"} 
+                    />
+                    <Text style={[styles.postDetailActionText, selectedPost.userLiked && styles.actionTextActive]}>
+                      {selectedPost.likeCount || 0} {(selectedPost.likeCount || 0) === 1 ? 'Like' : 'Likes'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.postDetailActionButton}>
+                    <Ionicons name="chatbubble-outline" size={24} color="#666" />
+                    <Text style={styles.postDetailActionText}>
+                      {selectedPost.comments?.length || 0} {(selectedPost.comments?.length || 0) === 1 ? 'Comment' : 'Comments'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.divider} />
+
+                {/* Comments Section */}
+                <Text style={styles.commentsTitle}>Comments</Text>
+                
+                {selectedPost.comments && selectedPost.comments.length > 0 ? (
+                  selectedPost.comments.map((comment) => (
+                    <View key={comment._id || comment.id} style={styles.commentContainer}>
+                      <View style={styles.commentHeader}>
+                        <View style={styles.commentAuthorAvatar}>
+                          <Text style={styles.commentAuthorInitials}>
+                            {comment.author 
+                              ? `${comment.author.firstName?.[0] || ''}${comment.author.lastName?.[0] || ''}`.toUpperCase()
+                              : 'AN'}
+                          </Text>
+                        </View>
+                        <View style={styles.commentContent}>
+                          <View style={styles.commentBubble}>
+                            <Text style={styles.commentAuthorName}>
+                              {comment.author 
+                                ? `${comment.author.firstName || ''} ${comment.author.lastName || ''}`.trim() 
+                                : 'Anonymous'}
+                            </Text>
+                            <Text style={styles.commentText}>{comment.content}</Text>
+                          </View>
+                          
+                          <View style={styles.commentActions}>
+                            <TouchableOpacity onPress={() => handleLikeComment(comment._id || comment.id)}>
+                              <Text style={[
+                                styles.commentActionText,
+                                (comment.likes?.length || 0) > 0 && styles.commentActionActive
+                              ]}>
+                                {(comment.likes?.length || 0) > 0 ? `Like (${comment.likes.length})` : 'Like'}
+                              </Text>
+                            </TouchableOpacity>
+                            <Text style={styles.commentActionDot}>•</Text>
+                            <TouchableOpacity onPress={() => handleReplyToComment(comment)}>
+                              <Text style={styles.commentActionText}>Reply</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.commentActionDot}>•</Text>
+                            <Text style={styles.commentTime}>{formatTimestamp(comment.createdAt)}</Text>
+                          </View>
+
+                          {/* Render Replies */}
+                          {comment.replies && comment.replies.length > 0 && (
+                            <View style={styles.repliesContainer}>
+                              {comment.replies.map((reply) => (
+                                <View key={reply._id || reply.id} style={styles.replyContainer}>
+                                  <View style={styles.replyAuthorAvatar}>
+                                    <Text style={styles.replyAuthorInitials}>
+                                      {reply.author 
+                                        ? `${reply.author.firstName?.[0] || ''}${reply.author.lastName?.[0] || ''}`.toUpperCase()
+                                        : 'AN'}
+                                    </Text>
+                                  </View>
+                                  <View style={styles.replyContent}>
+                                    <View style={styles.replyBubble}>
+                                      <Text style={styles.replyAuthorName}>
+                                        {reply.author 
+                                          ? `${reply.author.firstName || ''} ${reply.author.lastName || ''}`.trim() 
+                                          : 'Anonymous'}
+                                      </Text>
+                                      <Text style={styles.replyText}>{reply.content}</Text>
+                                    </View>
+                                    <Text style={styles.replyTime}>{formatTimestamp(reply.createdAt)}</Text>
+                                  </View>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.noCommentsText}>No comments yet. Be the first to comment!</Text>
+                )}
+              </ScrollView>
+
+              {/* Comment Input */}
+              <View style={styles.commentInputContainer}>
+                {replyingTo && (
+                  <View style={styles.replyingToBar}>
+                    <Text style={styles.replyingToText}>
+                      Replying to {replyingTo.authorName}
+                    </Text>
+                    <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                      <Ionicons name="close-circle" size={20} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <View style={styles.commentInputRow}>
+                  <TextInput
+                    style={styles.commentInputField}
+                    placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
+                    value={newComment}
+                    onChangeText={setNewComment}
+                    multiline
+                    maxLength={1000}
+                    placeholderTextColor="#999"
+                  />
+                  <TouchableOpacity 
+                    style={styles.sendButton}
+                    onPress={handleSubmitComment}
+                    disabled={!newComment.trim()}
+                  >
+                    <Ionicons 
+                      name="send" 
+                      size={24} 
+                      color={newComment.trim() ? "#512da8" : "#ccc"} 
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          ) : (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color="#6a1b9a" />
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Old Comment Modal - Keep for backward compatibility but hidden */}
       <Modal
         visible={showCommentModal}
         animationType="slide"
@@ -631,5 +891,219 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'right',
     marginTop: 8,
+  },
+  // Post Detail Modal Styles
+  postDetailContent: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  postDetailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  postDetailTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#333',
+    paddingHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  postDetailText: {
+    fontSize: 16,
+    color: '#555',
+    lineHeight: 24,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  postDetailActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  postDetailActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 32,
+  },
+  postDetailActionText: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: '#666',
+    fontWeight: '500',
+  },
+  divider: {
+    height: 8,
+    backgroundColor: '#f5f5f5',
+    marginVertical: 12,
+  },
+  commentsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  noCommentsText: {
+    fontSize: 15,
+    color: '#999',
+    textAlign: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+  },
+  commentContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+  },
+  commentAuthorAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#6a1b9a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  commentAuthorInitials: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  commentContent: {
+    flex: 1,
+  },
+  commentBubble: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  commentAuthorName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  commentText: {
+    fontSize: 15,
+    color: '#333',
+    lineHeight: 20,
+  },
+  commentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingLeft: 14,
+  },
+  commentActionText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '600',
+  },
+  commentActionActive: {
+    color: '#512da8',
+  },
+  commentActionDot: {
+    fontSize: 13,
+    color: '#999',
+    marginHorizontal: 8,
+  },
+  commentTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  repliesContainer: {
+    marginTop: 8,
+    marginLeft: 8,
+  },
+  replyContainer: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  replyAuthorAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#9C27B0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  replyAuthorInitials: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  replyContent: {
+    flex: 1,
+  },
+  replyBubble: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  replyAuthorName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  replyText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 18,
+  },
+  replyTime: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 4,
+    paddingLeft: 12,
+  },
+  commentInputContainer: {
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  replyingToBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f8f8f8',
+  },
+  replyingToText: {
+    fontSize: 13,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  commentInputField: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#333',
+    maxHeight: 100,
+    marginRight: 8,
+  },
+  sendButton: {
+    padding: 8,
   },
 });

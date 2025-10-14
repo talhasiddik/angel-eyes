@@ -505,6 +505,137 @@ router.post('/posts/:id/comments', async (req, res) => {
   }
 });
 
+// @route   PUT /api/community/posts/:postId/comments/:commentId/like
+// @desc    Like/unlike a comment
+// @access  Private
+router.put('/posts/:postId/comments/:commentId/like', async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+
+    if (!post || !post.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    const comment = post.comments.id(req.params.commentId);
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Comment not found'
+      });
+    }
+
+    const userLikeIndex = comment.likes.findIndex(
+      like => like.user.toString() === req.user._id.toString()
+    );
+
+    let action;
+    if (userLikeIndex > -1) {
+      // User already liked - remove like
+      comment.likes.splice(userLikeIndex, 1);
+      action = 'unliked';
+    } else {
+      // Add like
+      comment.likes.push({ user: req.user._id });
+      action = 'liked';
+    }
+
+    await post.save();
+
+    res.json({
+      success: true,
+      message: `Comment ${action} successfully`,
+      data: {
+        action,
+        likeCount: comment.likes.length,
+        commentId: comment._id
+      }
+    });
+  } catch (error) {
+    console.error('Like comment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating like'
+    });
+  }
+});
+
+// @route   POST /api/community/posts/:postId/comments/:commentId/replies
+// @desc    Reply to a comment
+// @access  Private
+router.post('/posts/:postId/comments/:commentId/replies', async (req, res) => {
+  try {
+    // Validate request body
+    const replySchema = Joi.object({
+      content: Joi.string().required().max(500).trim()
+    });
+
+    const { error, value } = replySchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message
+      });
+    }
+
+    const { content } = value;
+
+    const post = await Post.findById(req.params.postId);
+
+    if (!post || !post.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    const comment = post.comments.id(req.params.commentId);
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Comment not found'
+      });
+    }
+
+    const reply = {
+      author: req.user._id,
+      content,
+      createdAt: new Date()
+    };
+
+    comment.replies.push(reply);
+    await post.save();
+
+    // Populate the new reply
+    await post.populate('comments.replies.author', 'firstName lastName profilePicture');
+
+    const newReply = comment.replies[comment.replies.length - 1];
+
+    res.status(201).json({
+      success: true,
+      message: 'Reply added successfully',
+      data: {
+        reply: {
+          id: newReply._id,
+          author: newReply.author,
+          content: newReply.content,
+          createdAt: newReply.createdAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Add reply error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error adding reply'
+    });
+  }
+});
+
 // @route   GET /api/community/categories
 // @desc    Get community categories with post counts
 // @access  Private

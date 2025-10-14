@@ -265,6 +265,23 @@ class ApiClient {
     });
   }
 
+  async likeComment(postId, commentId) {
+    return this.request(`/community/posts/${postId}/comments/${commentId}/like`, {
+      method: 'PUT'
+    });
+  }
+
+  async replyToComment(postId, commentId, replyData) {
+    return this.request(`/community/posts/${postId}/comments/${commentId}/replies`, {
+      method: 'POST',
+      body: replyData
+    });
+  }
+
+  async getPostDetails(postId) {
+    return this.request(`/community/posts/${postId}`);
+  }
+
   // Generic HTTP methods for flexibility
   async get(endpoint, options = {}) {
     return this.request(endpoint, {
