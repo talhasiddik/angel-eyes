@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  BackHandler
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import authService from '../services/auth';
@@ -19,6 +20,35 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');  const [loading, setLoading] = useState(false);
+
+  // Handle hardware back button
+  useEffect(() => {
+    const backAction = () => {
+      Alert.alert(
+        'Exit App',
+        'Are you sure you want to exit?',
+        [
+          {
+            text: 'Cancel',
+            onPress: () => null,
+            style: 'cancel'
+          },
+          {
+            text: 'Yes',
+            onPress: () => BackHandler.exitApp()
+          }
+        ]
+      );
+      return true; // Prevent default behavior
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, []);
 
   const testConnection = async () => {
     try {
@@ -68,7 +98,7 @@ export default function SignupScreen() {
           [
             {
               text: 'Continue',
-              onPress: () => router.push('/babyprofile')
+              onPress: () => router.replace('/babyprofile')
             }
           ]
         );

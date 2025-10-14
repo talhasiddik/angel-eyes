@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   LogBox,
+  BackHandler
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import authService from '../services/auth';
@@ -19,6 +20,35 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Handle hardware back button
+  useEffect(() => {
+    const backAction = () => {
+      Alert.alert(
+        'Exit App',
+        'Are you sure you want to exit?',
+        [
+          {
+            text: 'Cancel',
+            onPress: () => null,
+            style: 'cancel'
+          },
+          {
+            text: 'Yes',
+            onPress: () => BackHandler.exitApp()
+          }
+        ]
+      );
+      return true; // Prevent default behavior
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -38,7 +68,7 @@ export default function LoginScreen() {
           [
             {
               text: 'Continue',
-              onPress: () => router.push('/dashboard')
+              onPress: () => router.replace('/dashboard')
             }
           ]
         );

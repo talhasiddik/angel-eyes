@@ -1,8 +1,37 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, SafeAreaView, Image, StatusBar } from "react-native";
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, SafeAreaView, Image, StatusBar, BackHandler, Alert } from "react-native";
 import { Link } from "expo-router";
 
 export default function Page() {
+  // Handle hardware back button
+  useEffect(() => {
+    const backAction = () => {
+      Alert.alert(
+        'Exit App',
+        'Are you sure you want to exit?',
+        [
+          {
+            text: 'Cancel',
+            onPress: () => null,
+            style: 'cancel'
+          },
+          {
+            text: 'Yes',
+            onPress: () => BackHandler.exitApp()
+          }
+        ]
+      );
+      return true; // Prevent default behavior
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, []);
+
   return (
     <ImageBackground
       source={{ uri: 'https://via.placeholder.com/600x1200' }}

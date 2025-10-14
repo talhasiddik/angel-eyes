@@ -195,7 +195,7 @@ export default function BabyProfileScreen() {
           [
             {
               text: 'Continue to Dashboard',
-              onPress: () => router.push('/dashboard')
+              onPress: () => router.replace('/dashboard')
             }
           ]
         );
@@ -278,7 +278,7 @@ export default function BabyProfileScreen() {
         },
         {
           text: 'Skip',
-          onPress: () => router.push('/dashboard')
+          onPress: () => router.replace('/dashboard')
         }
       ]
     );  };

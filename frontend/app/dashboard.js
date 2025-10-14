@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,10 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  BackHandler
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../services/api';
 import authService from '../services/auth';
@@ -25,6 +26,37 @@ export default function DashboardScreen() {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [loading, setLoading] = useState(true);  const [refreshing, setRefreshing] = useState(false);
   const [user, setUser] = useState(null);
+
+  // Handle hardware back button - only when dashboard is focused
+  useFocusEffect(
+    useCallback(() => {
+      const backAction = () => {
+        Alert.alert(
+          'Exit App',
+          'Are you sure you want to exit?',
+          [
+            {
+              text: 'Cancel',
+              onPress: () => null,
+              style: 'cancel'
+            },
+            {
+              text: 'Yes',
+              onPress: () => BackHandler.exitApp()
+            }
+          ]
+        );
+        return true; // Prevent default behavior
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        backAction
+      );
+
+      return () => backHandler.remove();
+    }, [])
+  );
 
   // Dashboard modules with simple icons instead of image imports
   const modules = [
@@ -137,7 +169,8 @@ export default function DashboardScreen() {
           text: 'Logout',
           onPress: async () => {
             await authService.logout();
-            router.push('/');
+            // Replace the navigation stack to prevent going back
+            router.replace('/');
           }
         }
       ]
