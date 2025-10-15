@@ -30,7 +30,11 @@ export default function DashboardScreen() {
   // Handle hardware back button - only when dashboard is focused
   useFocusEffect(
     useCallback(() => {
+      let isActive = true;
+
       const backAction = () => {
+        if (!isActive) return false; // Don't handle if not active
+        
         Alert.alert(
           'Exit App',
           'Are you sure you want to exit?',
@@ -54,7 +58,10 @@ export default function DashboardScreen() {
         backAction
       );
 
-      return () => backHandler.remove();
+      return () => {
+        isActive = false;
+        backHandler.remove();
+      };
     }, [])
   );
 
