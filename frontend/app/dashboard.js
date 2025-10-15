@@ -12,6 +12,7 @@ import {
   RefreshControl,
   BackHandler
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../services/api';
@@ -117,9 +118,35 @@ export default function DashboardScreen() {
       ]);
 
       if (babiesResponse.success) {
-        setBabies(babiesResponse.data.babies);
-        if (babiesResponse.data.babies.length > 0) {
-          setSelectedBaby(babiesResponse.data.babies[0]);
+        const babyList = babiesResponse.data.babies || [];
+        console.log('📊 Loaded babies:', babyList.length);
+        setBabies(babyList);
+        
+        if (babyList.length > 0) {
+          // Load previously selected baby from AsyncStorage
+          const savedBabyId = await AsyncStorage.getItem('selectedBabyId');
+          
+          if (savedBabyId) {
+            // Find the previously selected baby (use 'id' field from API)
+            const savedBaby = babyList.find(b => b.id === savedBabyId);
+            if (savedBaby) {
+              setSelectedBaby(savedBaby);
+            } else {
+              // If saved baby not found, select first baby
+              const firstBaby = babyList[0];
+              if (firstBaby.id) {
+                setSelectedBaby(firstBaby);
+                await AsyncStorage.setItem('selectedBabyId', firstBaby.id);
+              }
+            }
+          } else {
+            // No saved baby, select first one
+            const firstBaby = babyList[0];
+            if (firstBaby.id) {
+              setSelectedBaby(firstBaby);
+              await AsyncStorage.setItem('selectedBabyId', firstBaby.id);
+            }
+          }
         }
       }
 
@@ -208,8 +235,28 @@ export default function DashboardScreen() {
   };
 
   // Handle baby selection
-  const handleSelectBaby = (baby) => {
-    setSelectedBaby(baby);
+  const handleSelectBaby = async (baby) => {
+    try {
+      if (!baby.id) {
+        console.error('❌ Cannot select baby - no ID found:', baby);
+        Alert.alert('Error', 'Invalid baby data');
+        return;
+      }
+      
+      setSelectedBaby(baby);
+      
+      // Save selection to AsyncStorage for persistence
+      await AsyncStorage.setItem('selectedBabyId', baby.id);
+      
+      // Reload dashboard stats for the selected baby
+      const statsResponse = await apiClient.getDashboardStats();
+      if (statsResponse.success) {
+        setDashboardStats(statsResponse.data);
+      }
+    } catch (error) {
+      console.error('Failed to save selected baby:', error);
+      Alert.alert('Error', 'Failed to save baby selection');
+    }
   };
 
   if (loading) {
@@ -273,28 +320,38 @@ export default function DashboardScreen() {
               <FlatList
                 horizontal
                 data={babies}
-                keyExtractor={(item) => item._id || item.id}
+                keyExtractor={(item) => item.id || Math.random().toString()}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.babyListContainer}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.babyCard,
-                      selectedBaby?._id === item._id && styles.selectedBabyCard
-                    ]}
-                    onPress={() => handleSelectBaby(item)}
-                  >
-                    <View style={styles.babyIconContainer}>
-                      <Ionicons 
-                        name={item.gender === 'male' ? "male" : "female"} 
-                        size={24} 
-                        color={item.gender === 'male' ? "#4D96FF" : "#FF6B6B"} 
-                      />
-                    </View>
-                    <Text style={styles.babyName}>{item.name}</Text>
-                    <Text style={styles.babyAge}>{calculateAge(new Date(item.dateOfBirth))}</Text>
-                  </TouchableOpacity>
-                )}
+                renderItem={({ item }) => {
+                  const isSelected = selectedBaby?.id === item.id;
+                  
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.babyCard,
+                        isSelected && styles.selectedBabyCard
+                      ]}
+                      onPress={() => handleSelectBaby(item)}
+                    >
+                      {/* Selection badge */}
+                      {isSelected && (
+                        <View style={styles.selectedBadge}>
+                          <Ionicons name="checkmark-circle" size={20} color="#6a1b9a" />
+                        </View>
+                      )}
+                      <View style={styles.babyIconContainer}>
+                        <Ionicons 
+                          name={item.gender === 'male' || item.gender === 'Male' ? "male" : "female"} 
+                          size={24} 
+                          color={item.gender === 'male' || item.gender === 'Male' ? "#4D96FF" : "#FF6B6B"} 
+                        />
+                      </View>
+                      <Text style={styles.babyName}>{item.name}</Text>
+                      <Text style={styles.babyAge}>{calculateAge(new Date(item.dateOfBirth))}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
                 ListFooterComponent={
                   <TouchableOpacity
                     style={styles.addBabyCard}
@@ -496,11 +553,20 @@ const styles = StyleSheet.create({  container: {
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
+    position: 'relative',
   },
   selectedBabyCard: {
     backgroundColor: '#e8e0ff',
     borderColor: '#512da8',
     borderWidth: 2,
+  },
+  selectedBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    zIndex: 10,
   },
   addBabyCard: {
     backgroundColor: '#fff',

@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../services/api';
@@ -20,6 +21,7 @@ export default function RoutinesScreen() {
   const [routines, setRoutines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedBabyId, setSelectedBabyId] = useState(null);
 
   // Sample routine data - replace with API calls
   const sampleRoutines = [
@@ -58,14 +60,34 @@ export default function RoutinesScreen() {
   ];
 
   useEffect(() => {
-    loadRoutines();
+    loadSelectedBaby();
   }, []);
 
-  const loadRoutines = async () => {
+  const loadSelectedBaby = async () => {
+    try {
+      const babyId = await AsyncStorage.getItem('selectedBabyId');
+      if (babyId) {
+        setSelectedBabyId(babyId);
+        loadRoutines(babyId);
+      } else {
+        setLoading(false);
+        Alert.alert(
+          'No Baby Selected',
+          'Please select a baby from the dashboard first.',
+          [{ text: 'Go to Dashboard', onPress: () => router.back() }]
+        );
+      }
+    } catch (error) {
+      console.error('Failed to load selected baby:', error);
+      setLoading(false);
+    }
+  };
+
+  const loadRoutines = async (babyId) => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await apiClient.getRoutines();
+      // TODO: Replace with actual API call that uses babyId
+      // const response = await apiClient.getRoutines(babyId);
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
       setRoutines(sampleRoutines);
     } catch (error) {
@@ -78,11 +100,13 @@ export default function RoutinesScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadRoutines();
+    if (selectedBabyId) {
+      await loadRoutines(selectedBabyId);
+    }
     setRefreshing(false);
   };
 
-  const toggleRoutineCompletion = async (routineId) => {
+  const toggleRoutineComplete = (routineId) => {
     try {
       const updatedRoutines = routines.map(routine => {
         if (routine._id === routineId) {

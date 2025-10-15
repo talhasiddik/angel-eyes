@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../services/api';
@@ -21,6 +22,8 @@ export default function DetectionsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all'); // all, critical, warning, info
+  const [selectedBabyId, setSelectedBabyId] = useState(null);
+  const [babyName, setBabyName] = useState('');
 
   // Sample detection data - replace with API calls
   const sampleDetections = [
@@ -63,14 +66,42 @@ export default function DetectionsScreen() {
   ];
 
   useEffect(() => {
-    loadDetections();
+    loadSelectedBaby();
   }, []);
 
-  const loadDetections = async () => {
+  const loadSelectedBaby = async () => {
+    try {
+      const babyId = await AsyncStorage.getItem('selectedBabyId');
+      if (babyId) {
+        setSelectedBabyId(babyId);
+        // Load baby details to show name
+        const response = await apiClient.getBabies();
+        if (response.success) {
+          const baby = response.data.babies.find(b => b.id === babyId);
+          if (baby) {
+            setBabyName(baby.name);
+          }
+        }
+        loadDetections(babyId);
+      } else {
+        setLoading(false);
+        Alert.alert(
+          'No Baby Selected',
+          'Please select a baby from the dashboard first.',
+          [{ text: 'Go to Dashboard', onPress: () => router.back() }]
+        );
+      }
+    } catch (error) {
+      console.error('Failed to load selected baby:', error);
+      setLoading(false);
+    }
+  };
+
+  const loadDetections = async (babyId) => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await apiClient.getDetections();
+      // TODO: Replace with actual API call that uses babyId
+      // const response = await apiClient.getDetections(babyId);
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
       setDetections(sampleDetections);
     } catch (error) {
@@ -83,7 +114,9 @@ export default function DetectionsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadDetections();
+    if (selectedBabyId) {
+      await loadDetections(selectedBabyId);
+    }
     setRefreshing(false);
   };
 
@@ -214,7 +247,11 @@ export default function DetectionsScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#512da8" />
         </TouchableOpacity>
-        <Text style={styles.title}>AI Detections</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>AI Detections</Text>
+          {babyName ? <Text style={styles.subtitle}>{babyName}</Text> : null}
+        </View>
+        <View style={styles.placeholder} />
         <TouchableOpacity style={styles.settingsButton}>
           <Ionicons name="settings-outline" size={24} color="#512da8" />
         </TouchableOpacity>
@@ -316,13 +353,24 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  settingsButton: {
-    padding: 8,
+  titleContainer: {
+    alignItems: 'center',
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#512da8',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  placeholder: {
+    width: 40,
+  },
+  settingsButton: {
+    padding: 8,
   },
   summaryContainer: {
     flexDirection: 'row',

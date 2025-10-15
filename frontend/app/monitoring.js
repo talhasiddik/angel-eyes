@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../services/api';
@@ -17,6 +18,37 @@ export default function MonitoringScreen() {
   const router = useRouter();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [selectedBabyId, setSelectedBabyId] = useState(null);
+  const [babyName, setBabyName] = useState('');
+
+  useEffect(() => {
+    loadSelectedBaby();
+  }, []);
+
+  const loadSelectedBaby = async () => {
+    try {
+      const babyId = await AsyncStorage.getItem('selectedBabyId');
+      if (babyId) {
+        setSelectedBabyId(babyId);
+        // Load baby details to show name
+        const response = await apiClient.getBabies();
+        if (response.success) {
+          const baby = response.data.babies.find(b => b.id === babyId);
+          if (baby) {
+            setBabyName(baby.name);
+          }
+        }
+      } else {
+        Alert.alert(
+          'No Baby Selected',
+          'Please select a baby from the dashboard first.',
+          [{ text: 'Go to Dashboard', onPress: () => router.back() }]
+        );
+      }
+    } catch (error) {
+      console.error('Failed to load selected baby:', error);
+    }
+  };
 
   const startMonitoring = async () => {
     try {
@@ -62,7 +94,10 @@ export default function MonitoringScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#512da8" />
         </TouchableOpacity>
-        <Text style={styles.title}>Live Monitoring</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Live Monitoring</Text>
+          {babyName ? <Text style={styles.subtitle}>{babyName}</Text> : null}
+        </View>
         <View style={styles.placeholder} />
       </View>
 
@@ -175,10 +210,18 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  titleContainer: {
+    alignItems: 'center',
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#512da8',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
   },
   placeholder: {
     width: 40,
