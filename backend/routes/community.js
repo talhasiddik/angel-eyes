@@ -93,6 +93,10 @@ const postSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  commentsEnabled: {
+    type: Boolean,
+    default: true
+  },
   isReported: {
     type: Boolean,
     default: false
@@ -277,6 +281,7 @@ router.get('/posts', async (req, res) => {
       );
 
       return {
+        _id: post._id,
         id: post._id,
         author: post.author,
         title: post.title,
@@ -290,6 +295,8 @@ router.get('/posts', async (req, res) => {
         viewCount: post.viewCount,
         userLiked,
         isPinned: post.isPinned,
+        commentsEnabled: post.commentsEnabled,
+        isAuthor: post.author._id.toString() === req.user._id.toString(),
         createdAt: post.createdAt,
         recentComments: post.comments.slice(-3).reverse()
       };
@@ -350,12 +357,19 @@ router.get('/posts/:id', async (req, res) => {
       );
 
       return {
+        _id: comment._id,
         id: comment._id,
         author: comment.author,
         content: comment.content,
         likes: comment.likes.length,
         userLiked: userLikedComment,
-        replies: comment.replies,
+        replies: comment.replies.map(reply => ({
+          _id: reply._id,
+          id: reply._id,
+          author: reply.author,
+          content: reply.content,
+          createdAt: reply.createdAt
+        })),
         createdAt: comment.createdAt,
         updatedAt: comment.updatedAt
       };
@@ -365,6 +379,7 @@ router.get('/posts/:id', async (req, res) => {
       success: true,
       data: {
         post: {
+          _id: post._id,
           id: post._id,
           author: post.author,
           title: post.title,
@@ -377,6 +392,8 @@ router.get('/posts/:id', async (req, res) => {
           viewCount: post.viewCount,
           userLiked,
           isPinned: post.isPinned,
+          commentsEnabled: post.commentsEnabled,
+          isAuthor: post.author._id.toString() === req.user._id.toString(),
           comments: commentsWithUserLikes,
           createdAt: post.createdAt,
           updatedAt: post.updatedAt
@@ -441,6 +458,87 @@ router.put('/posts/:id/like', async (req, res) => {
   }
 });
 
+// @route   DELETE /api/community/posts/:id
+// @desc    Delete a post (soft delete)
+// @access  Private
+router.delete('/posts/:id', async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    // Check if user is the author
+    if (post.author.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to delete this post'
+      });
+    }
+
+    // Soft delete
+    post.isActive = false;
+    await post.save();
+
+    res.json({
+      success: true,
+      message: 'Post deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete post error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting post'
+    });
+  }
+});
+
+// @route   PUT /api/community/posts/:id/toggle-comments
+// @desc    Enable/disable comments on a post
+// @access  Private
+router.put('/posts/:id/toggle-comments', async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post || !post.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    // Check if user is the author
+    if (post.author.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to modify this post'
+      });
+    }
+
+    // Toggle comments
+    post.commentsEnabled = !post.commentsEnabled;
+    await post.save();
+
+    res.json({
+      success: true,
+      message: `Comments ${post.commentsEnabled ? 'enabled' : 'disabled'} successfully`,
+      data: {
+        commentsEnabled: post.commentsEnabled
+      }
+    });
+  } catch (error) {
+    console.error('Toggle comments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating post'
+    });
+  }
+});
+
 // @route   POST /api/community/posts/:id/comments
 // @desc    Add comment to a post
 // @access  Private
@@ -463,6 +561,14 @@ router.post('/posts/:id/comments', async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Post not found'
+      });
+    }
+
+    // Check if comments are enabled
+    if (!post.commentsEnabled) {
+      return res.status(403).json({
+        success: false,
+        message: 'Comments are disabled for this post'
       });
     }
 

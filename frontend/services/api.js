@@ -282,6 +282,18 @@ class ApiClient {
     return this.request(`/community/posts/${postId}`);
   }
 
+  async deletePost(postId) {
+    return this.request(`/community/posts/${postId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async togglePostComments(postId) {
+    return this.request(`/community/posts/${postId}/toggle-comments`, {
+      method: 'PUT'
+    });
+  }
+
   // Generic HTTP methods for flexibility
   async get(endpoint, options = {}) {
     return this.request(endpoint, {

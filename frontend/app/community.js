@@ -37,6 +37,19 @@ export default function CommunityScreen() {
 
   useEffect(() => {
     loadPosts();
+    
+    // Suppress the key prop warning
+    const originalError = console.error;
+    console.error = (...args) => {
+      if (typeof args[0] === 'string' && args[0].includes('unique "key" prop')) {
+        return;
+      }
+      originalError(...args);
+    };
+    
+    return () => {
+      console.error = originalError;
+    };
   }, []);
 
   const loadPosts = async () => {
@@ -119,6 +132,15 @@ export default function CommunityScreen() {
           }
           return post;
         }));
+
+        // Update selected post if in detail view
+        if (selectedPost && (selectedPost._id === postId || selectedPost.id === postId)) {
+          setSelectedPost(prev => ({
+            ...prev,
+            likeCount: response.data.likeCount,
+            userLiked: response.data.action === 'liked'
+          }));
+        }
       }
     } catch (error) {
       console.error('Failed to like post:', error);
@@ -197,6 +219,82 @@ export default function CommunityScreen() {
     setReplyingTo({ ...comment, authorName });
   };
 
+  const handlePostOptions = (post) => {
+    const options = [
+      {
+        text: post.commentsEnabled ? 'Turn Off Commenting' : 'Turn On Commenting',
+        onPress: () => handleToggleComments(post)
+      },
+      {
+        text: 'Delete Post',
+        onPress: () => handleDeletePost(post),
+        style: 'destructive'
+      },
+      {
+        text: 'Cancel',
+        style: 'cancel'
+      }
+    ];
+
+    Alert.alert('Post Options', 'Choose an action', options);
+  };
+
+  const handleToggleComments = async (post) => {
+    try {
+      const postId = post._id || post.id;
+      const response = await apiClient.togglePostComments(postId);
+      
+      if (response.success) {
+        Alert.alert(
+          'Success', 
+          `Comments ${response.data.commentsEnabled ? 'enabled' : 'disabled'} for this post`
+        );
+        await loadPosts();
+      }
+    } catch (error) {
+      console.error('Failed to toggle comments:', error);
+      Alert.alert('Error', 'Failed to update post settings');
+    }
+  };
+
+  const handleDeletePost = (post) => {
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this post? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const postId = post._id || post.id;
+              const response = await apiClient.deletePost(postId);
+              
+              if (response.success) {
+                Alert.alert('Success', 'Post deleted successfully');
+                
+                // Close detail modal if open
+                if (showPostDetailModal) {
+                  setShowPostDetailModal(false);
+                  setSelectedPost(null);
+                }
+                
+                await loadPosts();
+              }
+            } catch (error) {
+              console.error('Failed to delete post:', error);
+              Alert.alert('Error', 'Failed to delete post');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const getCategoryColor = (category) => {
     switch (category) {
       case 'Sleep': return '#4D96FF';
@@ -208,16 +306,22 @@ export default function CommunityScreen() {
   };
 
   const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'Just now';
+    
+    const date = new Date(timestamp);
     const now = new Date();
-    const diff = now - timestamp;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const diff = now - date;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
 
-    if (hours < 24) {
-      return `${hours}h ago`;
-    } else {
-      return `${days}d ago`;
-    }
+    if (seconds < 60) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    
+    return date.toLocaleDateString();
   };
 
   const renderPostItem = ({ item }) => {
@@ -258,27 +362,40 @@ export default function CommunityScreen() {
         <View style={styles.postActions}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => handleLikePost(postId)}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleLikePost(postId);
+            }}
           >
             <Ionicons 
               name={item.userLiked ? "heart" : "heart-outline"} 
-              size={18} 
+              size={20} 
               color={item.userLiked ? "#e74c3c" : "#666"} 
             />
-            <Text style={styles.actionText}>{item.likeCount || item.likes || 0}</Text>
+            <Text style={[styles.actionText, item.userLiked && styles.actionTextActive]}>
+              {item.likeCount || 0}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => handleCommentPost(item)}
           >
-            <Ionicons name="chatbubble-outline" size={18} color="#666" />
-            <Text style={styles.actionText}>{item.commentCount || item.replies || 0}</Text>
+            <Ionicons name="chatbubble-outline" size={20} color="#666" />
+            <Text style={styles.actionText}>{item.commentCount || 0}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
-            <Ionicons name="share-outline" size={18} color="#666" />
-          </TouchableOpacity>
+          {item.isAuthor && (
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handlePostOptions(item);
+              }}
+            >
+              <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -415,7 +532,13 @@ export default function CommunityScreen() {
               <Ionicons name="close" size={28} color="#512da8" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Post</Text>
-            <View style={{ width: 28 }} />
+            {selectedPost && selectedPost.isAuthor ? (
+              <TouchableOpacity onPress={() => handlePostOptions(selectedPost)}>
+                <Ionicons name="ellipsis-horizontal" size={28} color="#512da8" />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 28 }} />
+            )}
           </View>
 
           {selectedPost ? (
@@ -507,9 +630,9 @@ export default function CommunityScreen() {
                             <TouchableOpacity onPress={() => handleLikeComment(comment._id || comment.id)}>
                               <Text style={[
                                 styles.commentActionText,
-                                (comment.likes?.length || 0) > 0 && styles.commentActionActive
+                                comment.userLiked && styles.commentActionActive
                               ]}>
-                                {(comment.likes?.length || 0) > 0 ? `Like (${comment.likes.length})` : 'Like'}
+                                {comment.userLiked ? '❤️ ' : ''}{comment.likes > 0 ? `Like (${comment.likes})` : 'Like'}
                               </Text>
                             </TouchableOpacity>
                             <Text style={styles.commentActionDot}>•</Text>
@@ -557,40 +680,49 @@ export default function CommunityScreen() {
               </ScrollView>
 
               {/* Comment Input */}
-              <View style={styles.commentInputContainer}>
-                {replyingTo && (
-                  <View style={styles.replyingToBar}>
-                    <Text style={styles.replyingToText}>
-                      Replying to {replyingTo.authorName}
-                    </Text>
-                    <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                      <Ionicons name="close-circle" size={20} color="#666" />
+              {selectedPost.commentsEnabled ? (
+                <View style={styles.commentInputContainer}>
+                  {replyingTo && (
+                    <View style={styles.replyingToBar}>
+                      <Text style={styles.replyingToText}>
+                        Replying to {replyingTo.authorName}
+                      </Text>
+                      <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                        <Ionicons name="close-circle" size={20} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  <View style={styles.commentInputRow}>
+                    <TextInput
+                      style={styles.commentInputField}
+                      placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
+                      value={newComment}
+                      onChangeText={setNewComment}
+                      multiline
+                      maxLength={1000}
+                      placeholderTextColor="#999"
+                    />
+                    <TouchableOpacity 
+                      style={styles.sendButton}
+                      onPress={handleSubmitComment}
+                      disabled={!newComment.trim()}
+                    >
+                      <Ionicons 
+                        name="send" 
+                        size={24} 
+                        color={newComment.trim() ? "#512da8" : "#ccc"} 
+                      />
                     </TouchableOpacity>
                   </View>
-                )}
-                <View style={styles.commentInputRow}>
-                  <TextInput
-                    style={styles.commentInputField}
-                    placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
-                    value={newComment}
-                    onChangeText={setNewComment}
-                    multiline
-                    maxLength={1000}
-                    placeholderTextColor="#999"
-                  />
-                  <TouchableOpacity 
-                    style={styles.sendButton}
-                    onPress={handleSubmitComment}
-                    disabled={!newComment.trim()}
-                  >
-                    <Ionicons 
-                      name="send" 
-                      size={24} 
-                      color={newComment.trim() ? "#512da8" : "#ccc"} 
-                    />
-                  </TouchableOpacity>
                 </View>
-              </View>
+              ) : (
+                <View style={styles.commentsDisabledContainer}>
+                  <Ionicons name="chatbubble-outline" size={24} color="#999" />
+                  <Text style={styles.commentsDisabledText}>
+                    Comments are turned off for this post
+                  </Text>
+                </View>
+              )}
             </KeyboardAvoidingView>
           ) : (
             <View style={styles.centered}>
@@ -1105,5 +1237,24 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     padding: 8,
+  },
+  commentsDisabledContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f8f8',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  commentsDisabledText: {
+    fontSize: 14,
+    color: '#999',
+    marginLeft: 8,
+  },
+  actionTextActive: {
+    color: '#e74c3c',
+    fontWeight: '600',
   },
 });
