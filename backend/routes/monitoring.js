@@ -190,6 +190,79 @@ router.put('/:sessionId/end', async (req, res) => {
   }
 });
 
+// @route   POST /api/monitoring/sessions
+// @desc    Create a new monitoring session (simplified for mobile camera)
+// @access  Private
+router.post('/sessions', async (req, res) => {
+  try {
+    const { babyId, deviceType = 'mobile', deviceName = 'Mobile Camera' } = req.body;
+
+    if (!babyId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Baby ID is required'
+      });
+    }
+
+    // Verify baby exists and user has access
+    const baby = await Baby.findById(babyId);
+    if (!baby || !baby.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Baby not found'
+      });
+    }
+
+    if (!baby.hasAccess(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied to this baby'
+      });
+    }
+
+    // Create new session
+    const session = new MonitoringSession({
+      babyId,
+      startedBy: req.user._id,
+      sessionType: 'General',
+      status: 'Active',
+      startTime: new Date(),
+      settings: {
+        videoQuality: 'Medium',
+        audioEnabled: true,
+        nightVision: false,
+        motionDetection: true,
+        soundDetection: true,
+        safetyAlerts: true,
+        recordingEnabled: false
+      }
+    });
+
+    await session.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Monitoring session created successfully',
+      data: {
+        session: {
+          id: session._id,
+          babyId: session.babyId,
+          status: session.status,
+          startTime: session.startTime,
+          deviceType,
+          deviceName
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Create session error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating monitoring session'
+    });
+  }
+});
+
 // @route   GET /api/monitoring/sessions
 // @desc    Get monitoring sessions for user's babies
 // @access  Private
@@ -329,6 +402,66 @@ router.get('/sessions/:sessionId', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching monitoring session'
+    });
+  }
+});
+
+// @route   PATCH /api/monitoring/sessions/:sessionId
+// @desc    Update monitoring session (end session, update status)
+// @access  Private
+router.patch('/sessions/:sessionId', async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const session = await MonitoringSession.findById(req.params.sessionId);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Monitoring session not found'
+      });
+    }
+
+    // Verify baby access
+    const baby = await Baby.findById(session.babyId);
+    if (!baby || !baby.hasAccess(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied to this monitoring session'
+      });
+    }
+
+    // Update status
+    if (status === 'ended' && session.status === 'Active') {
+      session.status = 'Ended';
+      session.endTime = new Date();
+      
+      // Calculate duration in seconds
+      if (session.startTime) {
+        session.duration = Math.floor((session.endTime - session.startTime) / 1000);
+      }
+    }
+
+    await session.save();
+
+    res.json({
+      success: true,
+      message: 'Monitoring session updated successfully',
+      data: {
+        session: {
+          id: session._id,
+          status: session.status,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          duration: session.duration
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Update monitoring session error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating monitoring session'
     });
   }
 });

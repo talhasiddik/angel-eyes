@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,23 +7,59 @@ import {
   StatusBar,
   SafeAreaView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Dimensions
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import apiClient from '../services/api';
 
 export default function MonitoringScreen() {
   const router = useRouter();
+  const cameraRef = useRef(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [selectedBabyId, setSelectedBabyId] = useState(null);
   const [babyName, setBabyName] = useState('');
+  const [sessionId, setSessionId] = useState(null);
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [sessionDuration, setSessionDuration] = useState('00:00:00');
 
   useEffect(() => {
     loadSelectedBaby();
   }, []);
+
+  useEffect(() => {
+    let interval;
+    if (isMonitoring && sessionStartTime) {
+      interval = setInterval(() => {
+        const now = new Date();
+        const diff = Math.floor((now - sessionStartTime) / 1000);
+        const hours = Math.floor(diff / 3600).toString().padStart(2, '0');
+        const minutes = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+        const seconds = (diff % 60).toString().padStart(2, '0');
+        setSessionDuration(`${hours}:${minutes}:${seconds}`);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isMonitoring, sessionStartTime]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (isMonitoring && sessionId) {
+        // End session when navigating away
+        apiClient.patch(`/monitoring/sessions/${sessionId}`, {
+          status: 'ended'
+        }).catch(err => console.error('Failed to end session on unmount:', err));
+      }
+    };
+  }, [isMonitoring, sessionId]);
 
   const loadSelectedBaby = async () => {
     try {
@@ -52,19 +88,50 @@ export default function MonitoringScreen() {
 
   const startMonitoring = async () => {
     try {
+      // Check camera permission
+      if (!permission) {
+        Alert.alert('Error', 'Camera permissions not loaded');
+        return;
+      }
+
+      if (!permission.granted) {
+        const { granted } = await requestPermission();
+        if (!granted) {
+          Alert.alert(
+            'Camera Permission Required',
+            'Please grant camera permission to use live monitoring.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+
       setIsConnecting(true);
-      // TODO: Implement actual monitoring start logic
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate connection
-      setIsMonitoring(true);
-      Alert.alert('Success', 'Live monitoring started successfully!');
+
+      // Create monitoring session in backend
+      const response = await apiClient.post('/monitoring/sessions', {
+        babyId: selectedBabyId,
+        deviceType: 'mobile',
+        deviceName: 'Mobile Camera'
+      });
+
+      if (response.success) {
+        setSessionId(response.data.session.id);
+        setSessionStartTime(new Date());
+        setIsMonitoring(true);
+        Alert.alert('Success', 'Live monitoring started successfully!');
+      } else {
+        throw new Error(response.message || 'Failed to create session');
+      }
     } catch (error) {
+      console.error('Failed to start monitoring:', error);
       Alert.alert('Error', 'Failed to start monitoring. Please try again.');
     } finally {
       setIsConnecting(false);
     }
   };
 
-  const stopMonitoring = () => {
+  const stopMonitoring = async () => {
     Alert.alert(
       'Stop Monitoring',
       'Are you sure you want to stop live monitoring?',
@@ -73,9 +140,26 @@ export default function MonitoringScreen() {
         { 
           text: 'Stop', 
           style: 'destructive',
-          onPress: () => {
-            setIsMonitoring(false);
-            Alert.alert('Stopped', 'Live monitoring has been stopped.');
+          onPress: async () => {
+            try {
+              // End monitoring session in backend
+              if (sessionId) {
+                await apiClient.patch(`/monitoring/sessions/${sessionId}`, {
+                  status: 'ended'
+                });
+              }
+              
+              setIsMonitoring(false);
+              setSessionId(null);
+              setSessionStartTime(null);
+              Alert.alert('Stopped', 'Live monitoring has been stopped.');
+            } catch (error) {
+              console.error('Failed to stop monitoring:', error);
+              // Still stop locally even if backend fails
+              setIsMonitoring(false);
+              setSessionId(null);
+              setSessionStartTime(null);
+            }
           }
         }
       ]
@@ -102,19 +186,37 @@ export default function MonitoringScreen() {
       </View>
 
       <View style={styles.content}>
-        {/* Camera Preview Placeholder */}
+        {/* Camera Preview */}
         <View style={styles.cameraContainer}>
-          <View style={styles.cameraPlaceholder}>
-            <Ionicons 
-              name="videocam-outline" 
-              size={80} 
-              color="#ccc" 
-            />
-            <Text style={styles.cameraText}>Camera Feed</Text>
-            <Text style={styles.cameraSubtext}>
-              {isMonitoring ? 'Live streaming...' : 'Not connected'}
-            </Text>
-          </View>
+          {isMonitoring && permission?.granted ? (
+            <CameraView
+              ref={cameraRef}
+              style={styles.camera}
+              facing="back"
+              mode="video"
+            >
+              <View style={styles.cameraOverlay}>
+                <View style={styles.recordingIndicator}>
+                  <View style={styles.recordingDot} />
+                  <Text style={styles.recordingText}>LIVE</Text>
+                </View>
+              </View>
+            </CameraView>
+          ) : (
+            <View style={styles.cameraPlaceholder}>
+              <Ionicons 
+                name="videocam-outline" 
+                size={80} 
+                color="#ccc" 
+              />
+              <Text style={styles.cameraText}>
+                {!permission?.granted ? 'Camera Access Required' : 'Camera Feed'}
+              </Text>
+              <Text style={styles.cameraSubtext}>
+                {isMonitoring ? 'Loading camera...' : 'Tap Start Monitoring to begin'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Control Buttons */}
@@ -155,6 +257,17 @@ export default function MonitoringScreen() {
             />
             <Text style={styles.statusText}>
               {isMonitoring ? 'Connected' : 'Disconnected'}
+            </Text>
+          </View>
+          
+          <View style={styles.statusItem}>
+            <Ionicons 
+              name="time-outline" 
+              size={20} 
+              color={isMonitoring ? "#2196F3" : "#ccc"} 
+            />
+            <Text style={styles.statusText}>
+              Duration: {sessionDuration}
             </Text>
           </View>
           
@@ -236,6 +349,37 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
     overflow: 'hidden',
+  },
+  camera: {
+    flex: 1,
+    width: '100%',
+  },
+  cameraOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  recordingIndicator: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    marginRight: 8,
+  },
+  recordingText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   cameraPlaceholder: {
     flex: 1,

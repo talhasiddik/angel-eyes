@@ -324,6 +324,14 @@ class ApiClient {
       ...options
     });
   }
+
+  async patch(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      method: 'PATCH',
+      body: data,
+      ...options
+    });
+  }
 }
 
 // Create singleton instance
