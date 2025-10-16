@@ -8,13 +8,19 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
-  Dimensions
+  Dimensions,
+  ScrollView
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { captureRef } from 'react-native-view-shot';
+import * as FileSystem from 'expo-file-system/legacy';
 import apiClient from '../services/api';
+
+// Flask AI Service URL - CHANGE THIS TO YOUR COMPUTER'S IP
+const AI_SERVICE_URL = 'http://192.168.18.142:5001';
 
 export default function MonitoringScreen() {
   const router = useRouter();
@@ -27,6 +33,28 @@ export default function MonitoringScreen() {
   const [sessionId, setSessionId] = useState(null);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [sessionDuration, setSessionDuration] = useState('00:00:00');
+  
+  // AI Detection States
+  const [aiResults, setAiResults] = useState({
+    sleepSafety: {
+      isSafe: null,
+      confidence: 0,
+      alertLevel: 'normal',
+      position: 'unknown',
+      status: null,
+      message: ''
+    },
+    cryDetection: {
+      isCrying: false,
+      cryProbability: 0,
+      cryReason: null,
+      reasonConfidence: 0,
+      recommendations: []
+    },
+    lastUpdate: null
+  });
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const analysisIntervalRef = useRef(null);
 
   useEffect(() => {
     loadSelectedBaby();
@@ -52,8 +80,13 @@ export default function MonitoringScreen() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Stop AI analysis
+      if (analysisIntervalRef.current) {
+        clearInterval(analysisIntervalRef.current);
+      }
+      
+      // End session when navigating away
       if (isMonitoring && sessionId) {
-        // End session when navigating away
         apiClient.patch(`/monitoring/sessions/${sessionId}`, {
           status: 'ended'
         }).catch(err => console.error('Failed to end session on unmount:', err));
@@ -84,6 +117,125 @@ export default function MonitoringScreen() {
     } catch (error) {
       console.error('Failed to load selected baby:', error);
     }
+  };
+
+  // AI Analysis Functions
+  const captureAndAnalyzeFrame = async () => {
+    if (!cameraRef.current || isAnalyzing) return;
+
+    try {
+      setIsAnalyzing(true);
+
+      // Capture camera view as image using react-native-view-shot
+      const imageUri = await captureRef(cameraRef, {
+        format: 'jpg',
+        quality: 0.5,
+      });
+
+      console.log('📸 Image captured:', imageUri);
+
+      // Read image as base64 using expo-file-system
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: 'base64',  // Use string literal instead of EncodingType.Base64
+      });
+
+      if (!base64) {
+        console.log('❌ No base64 image data');
+        return;
+      }
+
+      console.log('✅ Base64 ready, length:', base64.length, 'sending to AI service...');
+
+      // Send to AI service for sleep safety analysis
+      const response = await fetch(`${AI_SERVICE_URL}/analyze-frame`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          frame: base64,  // Backend expects 'frame' not 'image'
+          sessionId: sessionId,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('🤖 AI Result:', result);
+        
+        // Update sleep safety results
+        setAiResults(prev => ({
+          ...prev,
+          sleepSafety: {
+            isSafe: result.is_safe,
+            confidence: result.confidence || 0,
+            alertLevel: result.alert_level || 'normal',
+            position: result.position_classification || result.position || 'unknown',
+            status: result.status || 'detection',
+            message: result.message || ''
+          },
+          lastUpdate: new Date()
+        }));
+
+        // Show alert for unsafe conditions (only if baby is actually detected)
+        if (!result.is_safe && result.alert_level === 'critical' && result.status !== 'no_detection') {
+          Alert.alert(
+            '⚠️ Safety Alert',
+            `Unsafe sleeping position detected!\nPosition: ${result.position_classification}\nConfidence: ${(result.confidence * 100).toFixed(1)}%`,
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('❌ AI service error:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('❌ Frame analysis error:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const startAIAnalysis = () => {
+    // Clear any existing interval
+    if (analysisIntervalRef.current) {
+      clearInterval(analysisIntervalRef.current);
+    }
+
+    // Start periodic frame analysis (every 2 seconds)
+    analysisIntervalRef.current = setInterval(() => {
+      captureAndAnalyzeFrame();
+    }, 2000);
+
+    // First analysis immediately
+    setTimeout(() => captureAndAnalyzeFrame(), 1000);
+  };
+
+  const stopAIAnalysis = () => {
+    if (analysisIntervalRef.current) {
+      clearInterval(analysisIntervalRef.current);
+      analysisIntervalRef.current = null;
+    }
+    
+    // Reset AI results
+    setAiResults({
+      sleepSafety: {
+        isSafe: null,
+        confidence: 0,
+        alertLevel: 'normal',
+        position: 'unknown',
+        status: null,
+        message: ''
+      },
+      cryDetection: {
+        isCrying: false,
+        cryProbability: 0,
+        cryReason: null,
+        reasonConfidence: 0,
+        recommendations: []
+      },
+      lastUpdate: null
+    });
   };
 
   const startMonitoring = async () => {
@@ -119,7 +271,11 @@ export default function MonitoringScreen() {
         setSessionId(response.data.session.id);
         setSessionStartTime(new Date());
         setIsMonitoring(true);
-        Alert.alert('Success', 'Live monitoring started successfully!');
+        
+        // Start AI analysis
+        startAIAnalysis();
+        
+        Alert.alert('Success', 'Live monitoring with AI detection started!');
       } else {
         throw new Error(response.message || 'Failed to create session');
       }
@@ -142,6 +298,9 @@ export default function MonitoringScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Stop AI analysis first
+              stopAIAnalysis();
+              
               // End monitoring session in backend
               if (sessionId) {
                 await apiClient.patch(`/monitoring/sessions/${sessionId}`, {
@@ -156,6 +315,7 @@ export default function MonitoringScreen() {
             } catch (error) {
               console.error('Failed to stop monitoring:', error);
               // Still stop locally even if backend fails
+              stopAIAnalysis();
               setIsMonitoring(false);
               setSessionId(null);
               setSessionStartTime(null);
@@ -185,7 +345,11 @@ export default function MonitoringScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContentContainer}
+        showsVerticalScrollIndicator={true}
+      >
         {/* Camera Preview */}
         <View style={styles.cameraContainer}>
           {isMonitoring && permission?.granted ? (
@@ -273,35 +437,175 @@ export default function MonitoringScreen() {
           
           <View style={styles.statusItem}>
             <Ionicons 
-              name="shield-checkmark" 
+              name={aiResults.sleepSafety.isSafe === true ? "shield-checkmark" : 
+                    aiResults.sleepSafety.isSafe === false ? "warning" : "shield-outline"} 
               size={20} 
-              color={isMonitoring ? "#4CAF50" : "#ccc"} 
+              color={aiResults.sleepSafety.isSafe === true ? "#4CAF50" : 
+                     aiResults.sleepSafety.isSafe === false ? "#F44336" : "#ccc"} 
             />
             <Text style={styles.statusText}>
               AI Detection {isMonitoring ? 'Active' : 'Inactive'}
+              {isAnalyzing && ' 🔄'}
             </Text>
           </View>
         </View>
 
-        {/* Feature Info */}
-        <View style={styles.featuresContainer}>
-          <Text style={styles.featuresTitle}>AI Safety Features</Text>
-          <View style={styles.featuresList}>
-            <View style={styles.featureItem}>
-              <Ionicons name="warning" size={16} color="#FF6B6B" />
-              <Text style={styles.featureText}>Choking Detection</Text>
+        {/* Real-time AI Results */}
+        {isMonitoring && aiResults.lastUpdate && (
+          <View style={styles.aiResultsContainer}>
+            <Text style={styles.aiResultsTitle}>🤖 Live AI Analysis</Text>
+            
+            {/* Sleep Safety Status */}
+            <View style={[
+              styles.aiResultCard,
+              { borderLeftColor: aiResults.sleepSafety.status === 'no_detection' ? '#FF9800' : 
+                                 aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336' }
+            ]}>
+              <View style={styles.aiResultHeader}>
+                <Ionicons 
+                  name="bed" 
+                  size={24} 
+                  color={aiResults.sleepSafety.status === 'no_detection' ? '#FF9800' : 
+                         aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336'} 
+                />
+                <Text style={styles.aiResultTitle}>Sleep Safety</Text>
+              </View>
+              
+              <View style={styles.aiResultContent}>
+                {aiResults.sleepSafety.status === 'no_detection' ? (
+                  <>
+                    <Text style={[
+                      styles.aiResultStatus,
+                      { color: '#FF9800' }
+                    ]}>
+                      👁️ NO BABY DETECTED
+                    </Text>
+                    <Text style={styles.aiResultMessage}>
+                      {aiResults.sleepSafety.message || 'No baby visible in camera view'}
+                    </Text>
+                    <Text style={styles.aiResultHint}>
+                      💡 Point the camera at the baby to start monitoring
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={[
+                      styles.aiResultStatus,
+                      { color: aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336' }
+                    ]}>
+                      {aiResults.sleepSafety.isSafe ? '✅ SAFE' : '⚠️ UNSAFE'}
+                    </Text>
+                    
+                    <View style={styles.aiResultDetails}>
+                      <Text style={styles.aiResultLabel}>Position:</Text>
+                      <Text style={styles.aiResultValue}>
+                        {aiResults.sleepSafety.position || 'Detecting...'}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.aiResultDetails}>
+                      <Text style={styles.aiResultLabel}>Confidence:</Text>
+                      <Text style={styles.aiResultValue}>
+                        {(aiResults.sleepSafety.confidence * 100).toFixed(1)}%
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.aiResultDetails}>
+                      <Text style={styles.aiResultLabel}>Alert Level:</Text>
+                      <Text style={[
+                        styles.aiResultValue,
+                        { color: aiResults.sleepSafety.alertLevel === 'critical' ? '#F44336' :
+                                 aiResults.sleepSafety.alertLevel === 'warning' ? '#FF9800' : '#4CAF50' }
+                      ]}>
+                        {aiResults.sleepSafety.alertLevel.toUpperCase()}
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="bed" size={16} color="#4D96FF" />
-              <Text style={styles.featureText}>Safe Sleep Monitoring</Text>
+
+            {/* Cry Detection Status */}
+            <View style={[
+              styles.aiResultCard,
+              { borderLeftColor: aiResults.cryDetection.isCrying ? '#FF6B6B' : '#4CAF50' }
+            ]}>
+              <View style={styles.aiResultHeader}>
+                <Ionicons 
+                  name="volume-high" 
+                  size={24} 
+                  color={aiResults.cryDetection.isCrying ? '#FF6B6B' : '#4CAF50'} 
+                />
+                <Text style={styles.aiResultTitle}>Cry Detection</Text>
+              </View>
+              
+              <View style={styles.aiResultContent}>
+                <Text style={[
+                  styles.aiResultStatus,
+                  { color: aiResults.cryDetection.isCrying ? '#FF6B6B' : '#4CAF50' }
+                ]}>
+                  {aiResults.cryDetection.isCrying ? '🔊 CRYING DETECTED' : '✅ No Crying'}
+                </Text>
+                
+                {aiResults.cryDetection.isCrying && aiResults.cryDetection.cryReason && (
+                  <>
+                    <View style={styles.aiResultDetails}>
+                      <Text style={styles.aiResultLabel}>Reason:</Text>
+                      <Text style={styles.aiResultValue}>
+                        {aiResults.cryDetection.cryReason}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.aiResultDetails}>
+                      <Text style={styles.aiResultLabel}>Confidence:</Text>
+                      <Text style={styles.aiResultValue}>
+                        {(aiResults.cryDetection.reasonConfidence * 100).toFixed(1)}%
+                      </Text>
+                    </View>
+                    
+                    {aiResults.cryDetection.recommendations && 
+                     aiResults.cryDetection.recommendations.length > 0 && (
+                      <View style={styles.recommendationsContainer}>
+                        <Text style={styles.recommendationsTitle}>💡 Recommendations:</Text>
+                        {aiResults.cryDetection.recommendations.map((rec, idx) => (
+                          <Text key={idx} style={styles.recommendationText}>
+                            • {rec}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
             </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="heart" size={16} color="#6BCB77" />
-              <Text style={styles.featureText}>Vital Signs Tracking</Text>
+            
+            <Text style={styles.lastUpdateText}>
+              Last updated: {new Date(aiResults.lastUpdate).toLocaleTimeString()}
+            </Text>
+          </View>
+        )}
+
+        {/* Feature Info - Only show when not monitoring */}
+        {!isMonitoring && (
+          <View style={styles.featuresContainer}>
+            <Text style={styles.featuresTitle}>AI Safety Features</Text>
+            <View style={styles.featuresList}>
+              <View style={styles.featureItem}>
+                <Ionicons name="bed" size={16} color="#4D96FF" />
+                <Text style={styles.featureText}>Sleep Position Safety Detection</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="volume-high" size={16} color="#FF6B6B" />
+                <Text style={styles.featureText}>Cry Detection & Reason Classification</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="shield-checkmark" size={16} color="#6BCB77" />
+                <Text style={styles.featureText}>Real-time AI Monitoring</Text>
+              </View>
             </View>
           </View>
-        </View>
-      </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -339,12 +643,14 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
-  content: {
+  scrollContent: {
     flex: 1,
+  },
+  scrollContentContainer: {
     padding: 16,
   },
   cameraContainer: {
-    flex: 1,
+    height: 400,  // Fixed height so it doesn't take full screen
     backgroundColor: '#000',
     borderRadius: 12,
     marginBottom: 20,
@@ -473,5 +779,102 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 14,
     color: '#666',
+  },
+  aiResultsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  aiResultsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#512da8',
+    marginBottom: 16,
+  },
+  aiResultCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+  },
+  aiResultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  aiResultTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+  },
+  aiResultContent: {
+    paddingLeft: 32,
+  },
+  aiResultStatus: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  aiResultDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  aiResultLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  aiResultValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  aiResultMessage: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  aiResultHint: {
+    fontSize: 13,
+    color: '#FF9800',
+    backgroundColor: '#FFF3E0',
+    padding: 8,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  recommendationsContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  recommendationsTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#512da8',
+    marginBottom: 8,
+  },
+  recommendationText: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  lastUpdateText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
