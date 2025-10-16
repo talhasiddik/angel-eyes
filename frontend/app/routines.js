@@ -289,6 +289,53 @@ export default function RoutinesScreen() {
           <Text style={styles.statLabel}>Progress</Text>
         </View>
       </View>
+
+      {/* Today's Activities Section */}
+      {todayEntries.length > 0 && (
+        <View style={styles.activitiesSection}>
+          <Text style={styles.sectionTitle}>📋 Today's Activities</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.activitiesScrollContent}
+          >
+            {todayEntries.map((entry, index) => {
+              const entryType = entry.type || entry.routine?.type || 'Activity';
+              const entryName = entry.routine?.name || entryType;
+              const entryTime = entry.timestamp || entry.createdAt;
+              const color = getRoutineColor(entryType);
+              
+              return (
+                <View key={entry._id || entry.id || index} style={[styles.activityCard, {borderLeftColor: color}]}>
+                  <View style={[styles.activityIcon, {backgroundColor: color + '20'}]}>
+                    <Ionicons name={getRoutineIcon(entryType)} size={20} color={color} />
+                  </View>
+                  <View style={styles.activityDetails}>
+                    <Text style={styles.activityName}>{entryName}</Text>
+                    <Text style={styles.activityTime}>
+                      {new Date(entryTime).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit',
+                        hour12: true 
+                      })}
+                    </Text>
+                    {entry.notes && (
+                      <Text style={styles.activityNotes} numberOfLines={1}>{entry.notes}</Text>
+                    )}
+                    {entry.amount && (
+                      <Text style={styles.activityDetail}>Amount: {entry.amount}</Text>
+                    )}
+                    {entry.duration && (
+                      <Text style={styles.activityDetail}>Duration: {entry.duration} min</Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       <FlatList
         data={routines}
         keyExtractor={(item) => item._id}
@@ -460,4 +507,14 @@ const styles = StyleSheet.create({
   typeButtonTextActive: { color: '#fff', fontWeight: '600' },
   submitButton: { backgroundColor: '#6a1b9a', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24, marginBottom: 16, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.2, shadowRadius: 4, elevation: 4 },
   submitButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  activitiesSection: { marginHorizontal: 16, marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#512da8', marginBottom: 12 },
+  activitiesScrollContent: { paddingRight: 16 },
+  activityCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginRight: 12, width: 160, borderLeftWidth: 4, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.08, shadowRadius: 4, elevation: 3 },
+  activityIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  activityDetails: { flex: 1 },
+  activityName: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 4 },
+  activityTime: { fontSize: 12, color: '#6a1b9a', fontWeight: '500', marginBottom: 4 },
+  activityNotes: { fontSize: 11, color: '#888', fontStyle: 'italic', marginTop: 4 },
+  activityDetail: { fontSize: 11, color: '#666', marginTop: 2 },
 });
