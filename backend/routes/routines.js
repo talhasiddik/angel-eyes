@@ -96,7 +96,8 @@ const routineSchema = new mongoose.Schema({
 
 // Virtual for next scheduled time
 routineSchema.virtual('nextScheduledTime').get(function() {
-  if (!this.schedule.length) return null;
+  if (!this.schedule || !this.schedule.length) return null;
+  if (!this.daysOfWeek || !this.daysOfWeek.length) return null;
   
   const now = new Date();
   const today = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
@@ -126,7 +127,7 @@ const routineEntrySchema = new mongoose.Schema({
   routineId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Routine',
-    required: true
+    required: false  // Changed to false to allow manual entries without routineId
   },
   babyId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -323,7 +324,7 @@ router.post('/', async (req, res) => {
 // @access  Private
 router.get('/', async (req, res) => {
   try {
-    const { babyId, type, isActive = true } = req.query;
+    const { babyId, type, isActive } = req.query;
 
     // Get user's babies
     const babies = await Baby.find({
@@ -351,7 +352,10 @@ router.get('/', async (req, res) => {
     }
 
     if (type) query.type = type;
-    if (isActive !== undefined) query.isActive = isActive === 'true';
+    // Only filter by isActive if explicitly provided
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true' || isActive === true;
+    }
 
     const routines = await Routine.find(query)
       .sort({ createdAt: -1 })
@@ -689,6 +693,54 @@ router.get('/today/:babyId', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching today\'s schedule'
+    });
+  }
+});
+
+// DELETE /routines/:id - Delete a routine
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the routine
+    const routine = await Routine.findById(id);
+
+    if (!routine) {
+      return res.status(404).json({
+        success: false,
+        message: 'Routine not found'
+      });
+    }
+
+    // Verify the user has permission to delete this routine
+    const baby = await Baby.findById(routine.babyId);
+    if (!baby) {
+      return res.status(404).json({
+        success: false,
+        message: 'Baby not found'
+      });
+    }
+
+    const isParent = baby.parents.some(p => p.toString() === req.user._id.toString());
+    if (!isParent && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to delete this routine'
+      });
+    }
+
+    // Delete the routine
+    await Routine.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: 'Routine deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete routine error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting routine'
     });
   }
 });
