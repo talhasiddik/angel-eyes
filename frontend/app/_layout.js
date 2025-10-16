@@ -1,22 +1,33 @@
 import React from 'react';
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
+import { View, StatusBar, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function Layout() {
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#fff',
-        },
-        headerTintColor: '#6a1b9a',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-        headerShadowVisible: false,
-      }}
-    >
+    <>
+      <StatusBar 
+        barStyle="dark-content" 
+        backgroundColor="#fff"
+        translucent={false}
+      />
+      <Stack
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: '#fff',
+          },
+          headerTintColor: '#6a1b9a',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+          headerShadowVisible: false,
+          statusBarTranslucent: false,
+          contentStyle: {
+            paddingTop: Platform.OS === 'android' ? 25 : 0,
+            backgroundColor: '#f5f5f5',
+          },
+        }}
+      >
       <Stack.Screen
         name="index"
         options={{
@@ -51,15 +62,34 @@ export default function Layout() {
       <Stack.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
-          headerBackTitleVisible: false,
-          presentation: 'card',          headerRight: () => (
-            <View style={{ marginRight: 15 }}>
-              <Ionicons name="settings-outline" size={24} color="#512da8" />
-            </View>
-          ),
+          headerShown: false,  // Hide React Navigation header - page has custom header
+        }}
+      />
+      <Stack.Screen
+        name="monitoring"
+        options={{
+          headerShown: false,  // Hide React Navigation header - page has custom header
+        }}
+      />
+      <Stack.Screen
+        name="detections"
+        options={{
+          headerShown: false,  // Hide React Navigation header - page has custom header
+        }}
+      />
+      <Stack.Screen
+        name="community"
+        options={{
+          headerShown: false,  // Hide React Navigation header - page has custom header
+        }}
+      />
+      <Stack.Screen
+        name="routines"
+        options={{
+          headerShown: false,  // Hide React Navigation header - page has custom header
         }}
       />
     </Stack>
+    </>
   );
 }
