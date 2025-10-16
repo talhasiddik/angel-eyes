@@ -1,0 +1,27 @@
+# Flask Web Framework
+Flask
+Flask-CORS
+
+# Core ML/AI Libraries
+tensorflow==2.15.0
+scikit-learn
+opencv-python
+numpy<2.0.0
+Pillow
+joblib
+h5py
+mediapipe
+
+# For PyTorch models (.pth files)
+# Install separately: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# torch
+# torchvision
+
+# Audio Processing (for cry detection models)
+librosa
+soundfile
+pydub
+
+# Utilities
+python-dotenv
+requests

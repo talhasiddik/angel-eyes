@@ -18,6 +18,11 @@ echo Updating API configuration...
 powershell -Command "(Get-Content 'frontend\services\api.js') -replace 'http://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:5000/api', 'http://%currentip%:5000/api' | Set-Content 'frontend\services\api.js'"
 powershell -Command "(Get-Content 'frontend\services\api.js') -replace 'http://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:5000', 'http://%currentip%:5000' | Set-Content 'frontend\services\api.js'"
 
+REM Update the AI Service URL in monitoring.js
+echo Updating AI Service URL in monitoring.js...
+powershell -Command "(Get-Content 'frontend\app\monitoring.js') -replace 'http://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:5001', 'http://%currentip%:5001' | Set-Content 'frontend\app\monitoring.js'"
+
 echo ✅ API updated to use IP: %currentip%
+echo ✅ AI Service URL updated to use IP: %currentip%
 echo 🚀 Now restart your frontend server!
 pause
