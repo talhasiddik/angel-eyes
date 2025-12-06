@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angel Eyes - Choose Monitoring Method</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #512da8 0%, #6a1b9a 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .intro {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .intro h2 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .intro p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .option-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 3px solid transparent;
+        }
+
+        .option-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border-color: #512da8;
+        }
+
+        .option-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .option-card h3 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .option-card p {
+            color: #666;
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .features {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .feature-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #512da8 0%, #6a1b9a 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(81, 45, 168, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .comparison {
+            margin-top: 40px;
+            padding-top: 40px;
+            border-top: 2px solid #eee;
+        }
+
+        .comparison h3 {
+            text-align: center;
+            font-size: 22px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .comparison-table th {
+            background: #512da8;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .comparison-table td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .check {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .cross {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        .warning {
+            color: #ff9800;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .options {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 28px;
+            }
+
+            .comparison-table {
+                font-size: 14px;
+            }
+
+            .comparison-table th,
+            .comparison-table td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👶 Angel Eyes Baby Monitor</h1>
+            <p>AI-Powered Sleep Safety Detection</p>
+        </div>
+
+        <div class="content">
+            <div class="intro">
+                <h2>Choose Your Monitoring Method</h2>
+                <p>
+                    Angel Eyes supports two ways to monitor your baby with the same powerful AI detection.
+                    Choose the method that works best for your situation.
+                </p>
+            </div>
+
+            <div class="options">
+                <!-- Mobile Camera Option -->
+                <div class="option-card">
+                    <div class="option-icon">📱</div>
+                    <h3>Mobile Camera</h3>
+                    <p>Use your phone's camera through the Expo React Native app for full-featured monitoring.</p>
+                    
+                    <div class="features">
+                        <div class="feature-item">
+                            <span>✅</span>
+                            <span>Full app features (Routines, Community)</span>
+                        </div>
+                        <div class="feature-item">
+                            <span>✅</span>
+                            <span>Multiple baby profiles</span>
+                        </div>
+                        <div class="feature-item">
+                            <span>✅</span>
+                            <span>Portable - monitor anywhere</span>
+                        </div>
+                        <div class="feature-item">
+                            <span>✅</span>
+                            <span>Session history tracking</span>
+                        </div>
+                        <div class="feature-item">
+                            <span>⚠️</span>
+                            <span>Drains phone battery</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="openMobileGuide()">
+                        📖 Mobile Setup Guide
+                    </button>
+                </div>
+
+                <!-- Webcam Option -->
+                <div class="option-card">
+                    <div class="option-icon">🎥</div>
+                    <h3>Logitech C270 Webcam</h3>
+                    <p>Use your USB webcam through a web browser for stable, long-duration monitoring.</p>
+                    
+                    <div class="features">
+                        <div class="feature-item">
+                            <span>✅</span>
+                            <span>No battery drain</span>
+                        </div>
+                        <div class="feature-item">
+                            <span>✅</span>
+                            <span>Stable fixed position</span>
+                        </div>
+                        <div class="feature-item">
+                            <span>✅</span>
+                            <span>HD 720p video quality</span>
+                        </div>
+                        <div class="feature-item">
+                            <span>✅</span>
+                            <span>Quick browser setup (30 sec)</span>
+                        </div>
+                        <div class="feature-item">
+                            <span>❌</span>
+                            <span>No app features (monitoring only)</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-secondary" onclick="openWebcam()">
+                        🚀 Start Webcam Monitor
+                    </button>
+                </div>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="comparison">
+                <h3>📊 Detailed Comparison</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Mobile App</th>
+                            <th>Webcam Browser</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Platform</strong></td>
+                            <td>iOS/Android (Expo)</td>
+                            <td>Any Browser</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Setup Time</strong></td>
+                            <td>2 minutes</td>
+                            <td>30 seconds</td>
+                        </tr>
+                        <tr>
+                            <td><strong>AI Sleep Detection</strong></td>
+                            <td><span class="check">✅ Every 2s</span></td>
+                            <td><span class="check">✅ Every 2s</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cry Detection</strong></td>
+                            <td><span class="check">✅ Yes</span></td>
+                            <td><span class="cross">❌ No (no mic)</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Battery Usage</strong></td>
+                            <td><span class="warning">⚠️ Drains battery</span></td>
+                            <td><span class="check">✅ No battery</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Portability</strong></td>
+                            <td><span class="check">✅ Take anywhere</span></td>
+                            <td><span class="cross">❌ Fixed location</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Video Quality</strong></td>
+                            <td>Phone dependent</td>
+                            <td>720p HD</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Stability</strong></td>
+                            <td><span class="warning">⚠️ Phone must stay still</span></td>
+                            <td><span class="check">✅ Mounted webcam</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Session History</strong></td>
+                            <td><span class="check">✅ Database saved</span></td>
+                            <td><span class="cross">❌ Not saved</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Routines Logging</strong></td>
+                            <td><span class="check">✅ Feed/Sleep/Diaper</span></td>
+                            <td><span class="cross">❌ Not available</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Community Features</strong></td>
+                            <td><span class="check">✅ Yes</span></td>
+                            <td><span class="cross">❌ Not available</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Best For</strong></td>
+                            <td>Daily use, Full features</td>
+                            <td>Testing, Long sessions</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openMobileGuide() {
+            alert('📱 Mobile App Setup:\n\n' +
+                  '1. Run: update-ip.bat\n' +
+                  '2. Start backend: cd backend && npm start\n' +
+                  '3. Start AI: cd ai-service && python app.py\n' +
+                  '4. Start app: cd frontend && npx expo start\n' +
+                  '5. Scan QR with Expo Go app\n\n' +
+                  'See README.md for detailed instructions!');
+        }
+
+        function openWebcam() {
+            // Check if AI service is running
+            fetch('http://192.168.18.73:5001/health')
+                .then(response => {
+                    if (response.ok) {
+                        // Open webcam monitor
+                        window.location.href = 'webcam-monitor.html';
+                    } else {
+                        alert('⚠️ AI Service not running!\n\n' +
+                              'Please start the AI service first:\n' +
+                              'cd backend/ai-service\n' +
+                              'python app.py');
+                    }
+                })
+                .catch(error => {
+                    alert('⚠️ Cannot connect to AI Service!\n\n' +
+                          'Please ensure:\n' +
+                          '1. AI service is running (python app.py)\n' +
+                          '2. Your firewall allows port 5001\n' +
+                          '3. IP address is correct: 192.168.18.73');
+                });
+        }
+    </script>
+</body>
+</html>

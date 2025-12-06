@@ -11,21 +11,19 @@ import {
   Dimensions,
   ScrollView
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { captureRef } from 'react-native-view-shot';
-import * as FileSystem from 'expo-file-system/legacy';
 import apiClient from '../services/api';
 
 // Flask AI Service URL - CHANGE THIS TO YOUR COMPUTER'S IP
-const AI_SERVICE_URL = 'http://192.168.18.142:5001';
+const AI_SERVICE_URL = 'http://192.168.18.73:5001';
+// Webcam Stream Server URL - CHANGE THIS TO YOUR COMPUTER'S IP
+const WEBCAM_STREAM_URL = 'http://192.168.18.73:5002';
 
 export default function MonitoringScreen() {
   const router = useRouter();
-  const cameraRef = useRef(null);
-  const [permission, requestPermission] = useCameraPermissions();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [selectedBabyId, setSelectedBabyId] = useState(null);
@@ -54,6 +52,7 @@ export default function MonitoringScreen() {
     lastUpdate: null
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [webcamUrl, setWebcamUrl] = useState(null);
   const analysisIntervalRef = useRef(null);
 
   useEffect(() => {
@@ -121,22 +120,28 @@ export default function MonitoringScreen() {
 
   // AI Analysis Functions
   const captureAndAnalyzeFrame = async () => {
-    if (!cameraRef.current || isAnalyzing) return;
+    if (isAnalyzing) return;
 
     try {
       setIsAnalyzing(true);
 
-      // Capture camera view as image using react-native-view-shot
-      const imageUri = await captureRef(cameraRef, {
-        format: 'jpg',
-        quality: 0.5,
-      });
+      // Get snapshot from webcam stream server
+      const snapshotResponse = await fetch(`${WEBCAM_STREAM_URL}/snapshot`);
+      
+      if (!snapshotResponse.ok) {
+        console.log('❌ Failed to get webcam snapshot');
+        return;
+      }
 
-      console.log('📸 Image captured:', imageUri);
-
-      // Read image as base64 using expo-file-system
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: 'base64',  // Use string literal instead of EncodingType.Base64
+      // Convert to base64
+      const blob = await snapshotResponse.blob();
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = reader.result.split(',')[1];
+          resolve(base64data);
+        };
+        reader.readAsDataURL(blob);
       });
 
       if (!base64) {
@@ -144,7 +149,7 @@ export default function MonitoringScreen() {
         return;
       }
 
-      console.log('✅ Base64 ready, length:', base64.length, 'sending to AI service...');
+      console.log('✅ Webcam snapshot captured, sending to AI service...');
 
       // Send to AI service for sleep safety analysis
       const response = await fetch(`${AI_SERVICE_URL}/analyze-frame`, {
@@ -240,31 +245,38 @@ export default function MonitoringScreen() {
 
   const startMonitoring = async () => {
     try {
-      // Check camera permission
-      if (!permission) {
-        Alert.alert('Error', 'Camera permissions not loaded');
-        return;
-      }
-
-      if (!permission.granted) {
-        const { granted } = await requestPermission();
-        if (!granted) {
+      // Check webcam stream server
+      try {
+        const healthCheck = await fetch(`${WEBCAM_STREAM_URL}/health`);
+        if (!healthCheck.ok) {
           Alert.alert(
-            'Camera Permission Required',
-            'Please grant camera permission to use live monitoring.',
+            'Webcam Server Not Running',
+            'Please start the webcam stream server first:\n\ncd backend\npython webcam-stream-server.py',
             [{ text: 'OK' }]
           );
           return;
         }
+        // Start webcam stream
+        await fetch(`${WEBCAM_STREAM_URL}/start`);
+      } catch (err) {
+        Alert.alert(
+          'Cannot Connect to Webcam',
+          'Make sure webcam stream server is running on port 5002',
+          [{ text: 'OK' }]
+        );
+        return;
       }
 
       setIsConnecting(true);
 
+      // Set webcam stream URL with cache buster
+      setWebcamUrl(`${WEBCAM_STREAM_URL}/video_feed?t=${Date.now()}`);
+
       // Create monitoring session in backend
       const response = await apiClient.post('/monitoring/sessions', {
         babyId: selectedBabyId,
-        deviceType: 'mobile',
-        deviceName: 'Mobile Camera'
+        deviceType: 'webcam',
+        deviceName: 'Logitech C270'
       });
 
       if (response.success) {
@@ -301,6 +313,9 @@ export default function MonitoringScreen() {
               // Stop AI analysis first
               stopAIAnalysis();
               
+              // Clear webcam URL
+              setWebcamUrl(null);
+              
               // End monitoring session in backend
               if (sessionId) {
                 await apiClient.patch(`/monitoring/sessions/${sessionId}`, {
@@ -316,6 +331,7 @@ export default function MonitoringScreen() {
               console.error('Failed to stop monitoring:', error);
               // Still stop locally even if backend fails
               stopAIAnalysis();
+              setWebcamUrl(null);
               setIsMonitoring(false);
               setSessionId(null);
               setSessionStartTime(null);
@@ -352,20 +368,22 @@ export default function MonitoringScreen() {
       >
         {/* Camera Preview */}
         <View style={styles.cameraContainer}>
-          {isMonitoring && permission?.granted ? (
-            <CameraView
-              ref={cameraRef}
-              style={styles.camera}
-              facing="back"
-              mode="video"
-            >
+          {isMonitoring && webcamUrl ? (
+            <View style={styles.camera}>
+              <WebView
+                source={{ uri: webcamUrl }}
+                style={styles.webcamStream}
+                scrollEnabled={false}
+                scalesPageToFit={true}
+                bounces={false}
+              />
               <View style={styles.cameraOverlay}>
                 <View style={styles.recordingIndicator}>
                   <View style={styles.recordingDot} />
-                  <Text style={styles.recordingText}>LIVE</Text>
+                  <Text style={styles.recordingText}>LIVE - WEBCAM</Text>
                 </View>
               </View>
-            </CameraView>
+            </View>
           ) : (
             <View style={styles.cameraPlaceholder}>
               <Ionicons 
@@ -374,10 +392,10 @@ export default function MonitoringScreen() {
                 color="#ccc" 
               />
               <Text style={styles.cameraText}>
-                {!permission?.granted ? 'Camera Access Required' : 'Camera Feed'}
+                Logitech C270 Webcam
               </Text>
               <Text style={styles.cameraSubtext}>
-                {isMonitoring ? 'Loading camera...' : 'Tap Start Monitoring to begin'}
+                {isMonitoring ? 'Loading webcam...' : 'Tap Start Monitoring to begin'}
               </Text>
             </View>
           )}
@@ -659,6 +677,11 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
     width: '100%',
+  },
+  webcamStream: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
   },
   cameraOverlay: {
     flex: 1,

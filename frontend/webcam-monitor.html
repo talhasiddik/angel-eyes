@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angel Eyes - Webcam Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #512da8 0%, #6a1b9a 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .video-section {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        #webcam {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .recording-badge {
+            background: rgba(244, 67, 54, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .recording-dot {
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .status-info h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-info p {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .ai-results {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .ai-results h2 {
+            font-size: 22px;
+            margin-bottom: 20px;
+            color: #512da8;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-box {
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 16px;
+        }
+
+        .alert-safe {
+            background: #d4edda;
+            color: #155724;
+            border-left: 5px solid #28a745;
+        }
+
+        .alert-unsafe {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 5px solid #dc3545;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 5px solid #ffc107;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 5px solid #17a2b8;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .info-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-item value {
+            display: block;
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 16px;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 14px;
+            border-top: 1px solid #eee;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👶 Angel Eyes - Webcam Monitor</h1>
+            <p>Real-time baby monitoring with AI-powered safety detection</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Video Section -->
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="webcam" autoplay playsinline></video>
+                    <div class="video-overlay" id="overlay" style="display: none;">
+                        <div class="recording-badge">
+                            <div class="recording-dot"></div>
+                            <span>LIVE</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hidden canvas for frame capture -->
+            <canvas id="canvas"></canvas>
+
+            <!-- Controls -->
+            <div class="controls">
+                <button id="startBtn" class="btn btn-start">
+                    <span>▶</span>
+                    Start Monitoring
+                </button>
+                <button id="stopBtn" class="btn btn-stop" style="display: none;">
+                    <span>⏹</span>
+                    Stop Monitoring
+                </button>
+            </div>
+
+            <!-- Status Cards -->
+            <div class="status-grid">
+                <div class="status-card">
+                    <div class="status-icon" style="background: #e3f2fd; color: #2196F3;">
+                        📹
+                    </div>
+                    <div class="status-info">
+                        <h3>Camera</h3>
+                        <p id="cameraStatus">Inactive</p>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon" style="background: #f3e5f5; color: #9c27b0;">
+                        🤖
+                    </div>
+                    <div class="status-info">
+                        <h3>AI Analysis</h3>
+                        <p id="aiStatus">Inactive</p>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon" style="background: #e8f5e9; color: #4CAF50;">
+                        ⏱️
+                    </div>
+                    <div class="status-info">
+                        <h3>Duration</h3>
+                        <p id="duration">00:00:00</p>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon" style="background: #fff3e0; color: #ff9800;">
+                        📊
+                    </div>
+                    <div class="status-info">
+                        <h3>Frames Analyzed</h3>
+                        <p id="frameCount">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Results -->
+            <div class="ai-results">
+                <h2>🧠 AI Detection Results</h2>
+                <div id="aiResultsContent">
+                    <div class="no-data">
+                        Start monitoring to see AI-powered sleep safety detection results
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>Angel Eyes Baby Monitor | Powered by MediaPipe + Random Forest AI</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - CHANGE THIS TO YOUR COMPUTER'S IP
+        const AI_SERVICE_URL = 'http://192.168.18.73:5001';
+        
+        // State
+        let isMonitoring = false;
+        let analysisInterval = null;
+        let durationInterval = null;
+        let startTime = null;
+        let frameCount = 0;
+        let stream = null;
+
+        // Elements
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const overlay = document.getElementById('overlay');
+        const aiResultsContent = document.getElementById('aiResultsContent');
+
+        // Start monitoring
+        startBtn.addEventListener('click', async () => {
+            try {
+                // Request webcam access
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    } 
+                });
+                
+                video.srcObject = stream;
+                video.play();
+
+                // Update UI
+                isMonitoring = true;
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'flex';
+                overlay.style.display = 'flex';
+                document.getElementById('cameraStatus').textContent = 'Active';
+                document.getElementById('aiStatus').textContent = 'Active';
+
+                // Start timer
+                startTime = new Date();
+                durationInterval = setInterval(updateDuration, 1000);
+
+                // Start AI analysis (every 2 seconds)
+                analysisInterval = setInterval(captureAndAnalyze, 2000);
+                
+                // First analysis immediately
+                setTimeout(captureAndAnalyze, 1000);
+
+                console.log('✅ Monitoring started');
+            } catch (error) {
+                console.error('❌ Error accessing webcam:', error);
+                alert('Failed to access webcam. Please ensure:\n1. Webcam is connected\n2. Browser has camera permissions\n3. No other app is using the camera');
+            }
+        });
+
+        // Stop monitoring
+        stopBtn.addEventListener('click', () => {
+            stopMonitoring();
+        });
+
+        function stopMonitoring() {
+            isMonitoring = false;
+
+            // Stop camera
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+
+            // Clear intervals
+            if (analysisInterval) clearInterval(analysisInterval);
+            if (durationInterval) clearInterval(durationInterval);
+
+            // Reset UI
+            startBtn.style.display = 'flex';
+            stopBtn.style.display = 'none';
+            overlay.style.display = 'none';
+            document.getElementById('cameraStatus').textContent = 'Inactive';
+            document.getElementById('aiStatus').textContent = 'Inactive';
+            aiResultsContent.innerHTML = '<div class="no-data">Monitoring stopped</div>';
+
+            console.log('⏹️ Monitoring stopped');
+        }
+
+        // Update duration
+        function updateDuration() {
+            if (!startTime) return;
+            
+            const now = new Date();
+            const diff = Math.floor((now - startTime) / 1000);
+            const hours = Math.floor(diff / 3600).toString().padStart(2, '0');
+            const minutes = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+            const seconds = (diff % 60).toString().padStart(2, '0');
+            
+            document.getElementById('duration').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+
+        // Capture frame and send to AI
+        async function captureAndAnalyze() {
+            if (!isMonitoring || !video.videoWidth) return;
+
+            try {
+                // Set canvas size to match video
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                // Draw current frame to canvas
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Convert to base64
+                const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+
+                console.log('📸 Frame captured, sending to AI service...');
+
+                // Send to AI service
+                const response = await fetch(`${AI_SERVICE_URL}/analyze-frame`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        frame: base64,
+                        sessionId: 'webcam-session',
+                        timestamp: new Date().toISOString(),
+                    }),
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('🤖 AI Result:', result);
+                    
+                    frameCount++;
+                    document.getElementById('frameCount').textContent = frameCount;
+                    
+                    displayResults(result);
+
+                    // Alert for critical unsafe conditions
+                    if (!result.is_safe && result.alert_level === 'critical' && result.status !== 'no_detection') {
+                        playAlertSound();
+                        showNotification('⚠️ Safety Alert', `Unsafe position detected: ${result.position_classification}`);
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('❌ AI service error:', response.status, errorText);
+                    aiResultsContent.innerHTML = `
+                        <div class="alert-box alert-warning">
+                            <span style="font-size: 24px;">⚠️</span>
+                            <div>
+                                <strong>AI Service Error</strong><br>
+                                Status: ${response.status} - ${errorText}
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('❌ Analysis error:', error);
+                aiResultsContent.innerHTML = `
+                    <div class="alert-box alert-warning">
+                        <span style="font-size: 24px;">⚠️</span>
+                        <div>
+                            <strong>Connection Error</strong><br>
+                            ${error.message}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Display AI results
+        function displayResults(result) {
+            const { is_safe, confidence, alert_level, position_classification, status, message } = result;
+
+            let alertClass = 'alert-info';
+            let alertIcon = 'ℹ️';
+            let alertTitle = 'Analyzing...';
+
+            if (status === 'no_detection') {
+                alertClass = 'alert-warning';
+                alertIcon = '👁️';
+                alertTitle = 'No Baby Detected';
+            } else if (is_safe) {
+                alertClass = 'alert-safe';
+                alertIcon = '✅';
+                alertTitle = 'Safe Position';
+            } else {
+                alertClass = 'alert-unsafe';
+                alertIcon = '⚠️';
+                alertTitle = 'Unsafe Position Detected!';
+            }
+
+            const html = `
+                <div class="alert-box ${alertClass}">
+                    <span style="font-size: 32px;">${alertIcon}</span>
+                    <div style="flex: 1;">
+                        <strong style="font-size: 18px;">${alertTitle}</strong><br>
+                        <span>${message || 'Monitoring baby sleep position...'}</span>
+                    </div>
+                </div>
+
+                ${status !== 'no_detection' ? `
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Position</label>
+                            <value>${position_classification || 'Unknown'}</value>
+                        </div>
+                        <div class="info-item">
+                            <label>Confidence</label>
+                            <value>${(confidence * 100).toFixed(1)}%</value>
+                        </div>
+                        <div class="info-item">
+                            <label>Alert Level</label>
+                            <value style="color: ${alert_level === 'critical' ? '#dc3545' : alert_level === 'warning' ? '#ffc107' : '#28a745'};">
+                                ${alert_level || 'Normal'}
+                            </value>
+                        </div>
+                        <div class="info-item">
+                            <label>Status</label>
+                            <value>${is_safe ? '✅ Safe' : '⚠️ Unsafe'}</value>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+
+            aiResultsContent.innerHTML = html;
+        }
+
+        // Alert sound
+        function playAlertSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.5);
+        }
+
+        // Browser notification
+        function showNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, { body, icon: '👶' });
+            } else if ('Notification' in window && Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification(title, { body, icon: '👶' });
+                    }
+                });
+            }
+        }
+
+        // Request notification permission on load
+        window.addEventListener('load', () => {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (isMonitoring) {
+                stopMonitoring();
+            }
+        });
+    </script>
+</body>
+</html>
