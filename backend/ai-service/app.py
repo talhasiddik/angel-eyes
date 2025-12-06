@@ -1,6 +1,6 @@
 """
-Flask AI Service for Baby Monitoring - Live Stream Processing
-Processes video frames and audio from React Native mobile camera
+Flask AI Service for Baby Monitoring - Video Stream Processing
+Processes video frames from Logitech C270 webcam for comprehensive baby monitoring
 """
 
 from flask import Flask, request, jsonify
@@ -10,10 +10,10 @@ import numpy as np
 import cv2
 import os
 from dotenv import load_dotenv
-import io
 
-# Import processors
-from processors.sleep_safety_detector import SleepSafetyDetector
+# Import updated processors
+from processors.awake_sleep_detector import AwakeSleepDetector
+from processors.sleep_position_detector import SleepPositionDetector
 from processors.cry_detector import CryDetector
 
 # Load environment variables
@@ -23,11 +23,17 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React Native
 
-# Initialize AI processors
-print("🤖 Loading AI models...")
-sleep_detector = SleepSafetyDetector()
+# Initialize AI processors with updated models
+print("="*70)
+print("BABY MONITORING AI SERVICE - VIDEO STREAM PROCESSING")
+print("="*70)
+print("\n🤖 Loading AI models...")
+awake_sleep_detector = AwakeSleepDetector()
+sleep_position_detector = SleepPositionDetector()
 cry_detector = CryDetector()
-print("✅ All AI models loaded successfully!")
+print("\n" + "="*70)
+print("✅ ALL AI MODELS LOADED SUCCESSFULLY!")
+print("="*70 + "\n")
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
@@ -35,19 +41,25 @@ def health_check():
     """Check if AI service is running and models are loaded"""
     return jsonify({
         'status': 'healthy',
-        'service': 'Baby Monitoring AI Service',
+        'service': 'Baby Monitoring AI Service (Video Stream)',
         'models_loaded': {
-            'sleep_safety': sleep_detector.is_loaded(),
+            'awake_sleep': awake_sleep_detector.is_loaded(),
+            'sleep_position': sleep_position_detector.is_loaded(),
             'cry_detection': cry_detector.is_loaded()
         }
     })
 
-# Live frame analysis endpoint
+# Main video frame analysis endpoint
 @app.route('/analyze-frame', methods=['POST'])
 def analyze_frame():
     """
-    Analyze a video frame from live camera stream for sleep safety
+    Analyze a video frame from webcam stream for comprehensive monitoring
     Expects JSON: { "frame": "base64_encoded_image", "sessionId": "session_id" }
+    
+    Returns:
+        - Awake/Sleep state (eye detection)
+        - Sleep position safety (pose detection)
+        - Combined safety assessment
     """
     try:
         data = request.json
@@ -59,7 +71,7 @@ def analyze_frame():
         image_base64 = data['frame']
         session_id = data.get('sessionId', 'unknown')
         
-        # Remove data URL prefix if present (data:image/jpeg;base64,...)
+        # Remove data URL prefix if present
         if ',' in image_base64:
             image_base64 = image_base64.split(',')[1]
         
@@ -71,24 +83,51 @@ def analyze_frame():
         if frame is None:
             return jsonify({'error': 'Invalid image data'}), 400
         
-        # Run sleep safety detection
-        result = sleep_detector.detect(frame)
+        # Run all detectors
+        awake_sleep_result = awake_sleep_detector.detect(frame)
+        sleep_position_result = sleep_position_detector.detect(frame)
         
-        # Add session info
-        result['sessionId'] = session_id
-        result['timestamp'] = data.get('timestamp', None)
+        # Determine overall safety
+        overall_safety = determine_overall_safety(awake_sleep_result, sleep_position_result)
+        
+        # Combine results
+        result = {
+            'sessionId': session_id,
+            'timestamp': data.get('timestamp', None),
+            'success': True,
+            
+            # Awake/Sleep Detection
+            'awake_sleep': {
+                'state': awake_sleep_result.get('state', 'unknown'),
+                'confidence': awake_sleep_result.get('confidence', 0.0),
+                'success': awake_sleep_result.get('success', False)
+            },
+            
+            # Sleep Position Detection
+            'sleep_position': {
+                'position': sleep_position_result.get('position', 'unknown'),
+                'is_safe': sleep_position_result.get('is_safe', False),
+                'confidence': sleep_position_result.get('confidence', 0.0),
+                'success': sleep_position_result.get('success', False)
+            },
+            
+            # Overall Safety Assessment
+            'safety': overall_safety
+        }
         
         return jsonify(result), 200
         
     except Exception as e:
         print(f"❌ Error analyzing frame: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # Audio analysis endpoint for cry detection
 @app.route('/analyze-audio', methods=['POST'])
 def analyze_audio():
     """
-    Analyze audio from live stream for cry detection
+    Analyze audio from microphone for cry detection
     Expects JSON: { "audio": "base64_encoded_audio", "sessionId": "session_id" }
     """
     try:
@@ -108,8 +147,8 @@ def analyze_audio():
         # Decode audio
         audio_data = base64.b64decode(audio_base64)
         
-        # Run cry detection (two-stage)
-        result = cry_detector.detect_from_bytes(audio_data)
+        # Run cry detection
+        result = cry_detector.detect(audio_data)
         
         # Add session info
         result['sessionId'] = session_id
@@ -121,87 +160,110 @@ def analyze_audio():
         print(f"❌ Error analyzing audio: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# Combined analysis endpoint (optional - for efficiency)
-@app.route('/analyze-stream', methods=['POST'])
-def analyze_stream():
+def determine_overall_safety(awake_sleep_result, sleep_position_result):
     """
-    Analyze both video frame and audio chunk together
-    Expects JSON: { "frame": "base64", "audio": "base64", "sessionId": "id" }
+    Determine overall safety based on multiple factors
+    
+    Rules:
+    1. If baby is AWAKE → Generally SAFE (active monitoring)
+    2. If baby is ASLEEP:
+       - SAFE position (back) → SAFE
+       - UNSAFE position (stomach/side) → UNSAFE (CRITICAL ALERT)
+    3. If awake/sleep detection unavailable → Use position only
+    4. If all detection fails → UNKNOWN
     """
-    try:
-        data = request.json
-        results = {}
-        
-        # Analyze frame if present
-        if 'frame' in data and data['frame']:
-            image_base64 = data['frame']
-            if ',' in image_base64:
-                image_base64 = image_base64.split(',')[1]
-            
-            img_data = base64.b64decode(image_base64)
-            nparr = np.frombuffer(img_data, np.uint8)
-            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            
-            if frame is not None:
-                results['sleep_safety'] = sleep_detector.detect(frame)
-        
-        # Analyze audio if present
-        if 'audio' in data and data['audio']:
-            audio_base64 = data['audio']
-            if ',' in audio_base64:
-                audio_base64 = audio_base64.split(',')[1]
-            
-            audio_data = base64.b64decode(audio_base64)
-            results['cry_detection'] = cry_detector.detect_from_bytes(audio_data)
-        
-        # Add metadata
-        results['sessionId'] = data.get('sessionId', 'unknown')
-        results['timestamp'] = data.get('timestamp', None)
-        
-        return jsonify(results), 200
-        
-    except Exception as e:
-        print(f"❌ Error analyzing stream: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+    
+    # Check if we have valid results
+    awake_sleep_success = awake_sleep_result.get('success', False)
+    position_success = sleep_position_result.get('success', False)
+    
+    if not awake_sleep_success and not position_success:
+        return {
+            'level': 'unknown',
+            'message': 'Unable to detect baby state',
+            'alert': False,
+            'confidence': 0.0
+        }
+    
+    # Get states
+    is_awake = awake_sleep_result.get('state') == 'awake'
+    is_safe_position = sleep_position_result.get('is_safe', False)
+    
+    # Calculate combined confidence
+    confidences = []
+    if awake_sleep_success:
+        confidences.append(awake_sleep_result.get('confidence', 0.0))
+    if position_success:
+        confidences.append(sleep_position_result.get('confidence', 0.0))
+    
+    avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+    
+    # If awake/sleep detection unavailable, use position only
+    if not awake_sleep_success:
+        if position_success:
+            if is_safe_position:
+                return {
+                    'level': 'safe',
+                    'message': 'Baby in safe sleeping position (back)',
+                    'alert': False,
+                    'confidence': float(avg_confidence)
+                }
+            else:
+                return {
+                    'level': 'critical',
+                    'message': 'UNSAFE: Baby on stomach - SIDS risk!',
+                    'alert': True,
+                    'alert_type': 'position',
+                    'confidence': float(avg_confidence)
+                }
+    
+    # Safety logic with awake/sleep detection
+    if is_awake:
+        # Baby is awake - generally safe
+        return {
+            'level': 'safe',
+            'message': 'Baby is awake and active',
+            'alert': False,
+            'confidence': float(avg_confidence)
+        }
+    else:
+        # Baby is asleep - check position
+        if position_success:
+            if is_safe_position:
+                return {
+                    'level': 'safe',
+                    'message': 'Baby sleeping in safe position (back)',
+                    'alert': False,
+                    'confidence': float(avg_confidence)
+                }
+            else:
+                return {
+                    'level': 'critical',
+                    'message': 'UNSAFE: Baby sleeping on stomach - SIDS risk!',
+                    'alert': True,
+                    'alert_type': 'position',
+                    'confidence': float(avg_confidence)
+                }
+        else:
+            # Position detection failed but baby is asleep
+            return {
+                'level': 'warning',
+                'message': 'Baby asleep but position unclear',
+                'alert': True,
+                'alert_type': 'unclear_position',
+                'confidence': float(avg_confidence)
+            }
 
-# Test endpoint
-@app.route('/test', methods=['GET'])
-def test():
-    """Simple test endpoint"""
-    return jsonify({
-        'message': 'AI Service is running!',
-        'version': '1.0.0',
-        'endpoints': [
-            'GET  /health          - Service health check',
-            'POST /analyze-frame   - Analyze video frame (sleep safety)',
-            'POST /analyze-audio   - Analyze audio (cry detection)',
-            'POST /analyze-stream  - Analyze both frame and audio',
-            'GET  /test            - This endpoint'
-        ]
-    })
-
-# Error handlers
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({'error': 'Endpoint not found'}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
-
+# Run the Flask app
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5001))
-    debug = os.getenv('DEBUG', 'True').lower() == 'true'
-    
-    print(f"\n{'='*70}")
-    print(f"🚀 Baby Monitoring AI Service")
-    print(f"{'='*70}")
-    print(f"📡 Running on: http://0.0.0.0:{port}")
-    print(f"🔧 Debug mode: {debug}")
-    print(f"{'='*70}\n")
+    print(f"\n🚀 Starting AI Service on port {port}...")
+    print(f"📡 Listening for video frames from webcam stream server...")
+    print(f"Press CTRL+C to stop\n")
     
     app.run(
         host='0.0.0.0',
         port=port,
-        debug=debug
+        debug=False,
+        threaded=True
     )

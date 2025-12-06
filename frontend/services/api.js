@@ -1,9 +1,9 @@
 const API_BASE_URL = __DEV__ 
-  ? 'http://192.168.18.73:5000/api' 
+  ? 'http://192.168.18.142:5000/api' 
   : 'https://your-production-api.com/api';
 
 const SOCKET_URL = __DEV__ 
-  ? 'http://192.168.18.73:5000' 
+  ? 'http://192.168.18.142:5000' 
   : 'https://your-production-api.com';
 
 class ApiClient {

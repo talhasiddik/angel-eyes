@@ -18,9 +18,9 @@ import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../services/api';
 
 // Flask AI Service URL - CHANGE THIS TO YOUR COMPUTER'S IP
-const AI_SERVICE_URL = 'http://192.168.18.73:5001';
+const AI_SERVICE_URL = 'http://192.168.18.142:5001';
 // Webcam Stream Server URL - CHANGE THIS TO YOUR COMPUTER'S IP
-const WEBCAM_STREAM_URL = 'http://192.168.18.73:5002';
+const WEBCAM_STREAM_URL = 'http://192.168.18.142:5002';
 
 export default function MonitoringScreen() {
   const router = useRouter();
