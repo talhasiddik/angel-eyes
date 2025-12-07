@@ -84,9 +84,11 @@ export default function MonitoringScreen() {
     };
   }, [isMonitoring, sessionStartTime]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount ONLY (no dependencies)
   useEffect(() => {
     return () => {
+      console.log('🧹 Component unmounting - cleaning up intervals');
+      
       // Stop AI analysis
       if (analysisIntervalRef.current) {
         clearInterval(analysisIntervalRef.current);
@@ -104,7 +106,7 @@ export default function MonitoringScreen() {
         }).catch(err => console.error('Failed to end session on unmount:', err));
       }
     };
-  }, [isMonitoring, sessionId]);
+  }, []); // Empty dependency array - only run on unmount
 
   const loadSelectedBaby = async () => {
     try {
@@ -201,8 +203,13 @@ export default function MonitoringScreen() {
 
   // AI Analysis Functions
   const captureAndAnalyzeFrame = async () => {
-    if (isAnalyzing) return;
+    if (isAnalyzing) {
+      console.log('⏭️ Skipping frame analysis - already analyzing');
+      return;
+    }
 
+    console.log('📸 Starting frame capture and analysis...');
+    
     try {
       setIsAnalyzing(true);
 
@@ -299,6 +306,7 @@ export default function MonitoringScreen() {
       console.error('❌ Frame analysis error:', error);
     } finally {
       setIsAnalyzing(false);
+      console.log('✅ Frame analysis completed, isAnalyzing reset to false');
     }
   };
 
@@ -371,6 +379,8 @@ export default function MonitoringScreen() {
   };
 
   const startAIAnalysis = () => {
+    console.log('🚀 Starting AI Analysis with intervals...');
+    
     // Clear any existing interval
     if (analysisIntervalRef.current) {
       clearInterval(analysisIntervalRef.current);
@@ -381,14 +391,18 @@ export default function MonitoringScreen() {
 
     // Start periodic frame analysis (every 2 seconds)
     analysisIntervalRef.current = setInterval(() => {
+      console.log('⏰ Frame analysis interval triggered');
       captureAndAnalyzeFrame();
     }, 2000);
 
     // Start periodic audio analysis (every 3 seconds - matches audio clip duration)
     audioAnalysisIntervalRef.current = setInterval(() => {
+      console.log('⏰ Audio analysis interval triggered');
       captureAndAnalyzeAudio();
     }, 3000);
 
+    console.log('✅ Intervals set - Frame: every 2s, Audio: every 3s');
+    
     // First analysis immediately
     setTimeout(() => captureAndAnalyzeFrame(), 1000);
     setTimeout(() => captureAndAnalyzeAudio(), 1500);
