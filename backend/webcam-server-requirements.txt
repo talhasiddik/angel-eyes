@@ -1,0 +1,17 @@
+# Webcam Stream Server with Audio Capture
+# For Logitech C270 webcam + microphone
+
+# Flask Web Framework
+Flask
+Flask-CORS
+
+# Video Processing
+opencv-python
+
+# Audio Recording
+PyAudio
+
+# Note: PyAudio installation on Windows:
+# pip install pipwin
+# pipwin install pyaudio
+# OR download wheel from: https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio

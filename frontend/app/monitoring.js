@@ -34,26 +34,34 @@ export default function MonitoringScreen() {
   
   // AI Detection States
   const [aiResults, setAiResults] = useState({
+    awakeSleep: {
+      state: 'unknown',
+      confidence: 0,
+      success: false
+    },
     sleepSafety: {
       isSafe: null,
       confidence: 0,
-      alertLevel: 'normal',
       position: 'unknown',
-      status: null,
+      success: false,
       message: ''
+    },
+    overallSafety: {
+      level: 'unknown',
+      message: '',
+      alert: false,
+      confidence: 0
     },
     cryDetection: {
       isCrying: false,
-      cryProbability: 0,
-      cryReason: null,
-      reasonConfidence: 0,
-      recommendations: []
+      confidence: 0
     },
     lastUpdate: null
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [webcamUrl, setWebcamUrl] = useState(null);
   const analysisIntervalRef = useRef(null);
+  const audioAnalysisIntervalRef = useRef(null);
 
   useEffect(() => {
     loadSelectedBaby();
@@ -82,6 +90,11 @@ export default function MonitoringScreen() {
       // Stop AI analysis
       if (analysisIntervalRef.current) {
         clearInterval(analysisIntervalRef.current);
+      }
+      
+      // Stop audio analysis
+      if (audioAnalysisIntervalRef.current) {
+        clearInterval(audioAnalysisIntervalRef.current);
       }
       
       // End session when navigating away
@@ -168,25 +181,38 @@ export default function MonitoringScreen() {
         const result = await response.json();
         console.log('🤖 AI Result:', result);
         
-        // Update sleep safety results
+        // Update all AI results from backend response
         setAiResults(prev => ({
           ...prev,
+          // Awake/Sleep Detection
+          awakeSleep: {
+            state: result.awake_sleep?.state || 'unknown',
+            confidence: result.awake_sleep?.confidence || 0,
+            success: result.awake_sleep?.success || false
+          },
+          // Sleep Position Detection
           sleepSafety: {
-            isSafe: result.is_safe,
-            confidence: result.confidence || 0,
-            alertLevel: result.alert_level || 'normal',
-            position: result.position_classification || result.position || 'unknown',
-            status: result.status || 'detection',
-            message: result.message || ''
+            isSafe: result.sleep_position?.is_safe || false,
+            confidence: result.sleep_position?.confidence || 0,
+            position: result.sleep_position?.position || 'unknown',
+            success: result.sleep_position?.success || false,
+            message: result.safety?.message || ''
+          },
+          // Overall Safety Assessment
+          overallSafety: {
+            level: result.safety?.level || 'unknown',
+            message: result.safety?.message || '',
+            alert: result.safety?.alert || false,
+            confidence: result.safety?.confidence || 0
           },
           lastUpdate: new Date()
         }));
 
-        // Show alert for unsafe conditions (only if baby is actually detected)
-        if (!result.is_safe && result.alert_level === 'critical' && result.status !== 'no_detection') {
+        // Show alert for critical safety issues
+        if (result.safety?.alert && result.safety?.level === 'critical') {
           Alert.alert(
-            '⚠️ Safety Alert',
-            `Unsafe sleeping position detected!\nPosition: ${result.position_classification}\nConfidence: ${(result.confidence * 100).toFixed(1)}%`,
+            '⚠️ CRITICAL SAFETY ALERT',
+            result.safety?.message || 'Unsafe condition detected!',
             [{ text: 'OK' }]
           );
         }
@@ -201,10 +227,76 @@ export default function MonitoringScreen() {
     }
   };
 
+  const captureAndAnalyzeAudio = async () => {
+    try {
+      // Get audio snapshot from webcam stream server
+      const audioResponse = await fetch(`${WEBCAM_STREAM_URL}/audio_snapshot`);
+      
+      if (!audioResponse.ok) {
+        console.log('❌ Failed to get audio snapshot');
+        return;
+      }
+
+      const audioData = await audioResponse.json();
+      
+      if (!audioData.audio) {
+        console.log('❌ No audio data');
+        return;
+      }
+
+      console.log('✅ Audio snapshot captured, sending to AI service...');
+
+      // Send to AI service for cry detection
+      const response = await fetch(`${AI_SERVICE_URL}/analyze-audio`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          audio: audioData.audio,
+          sessionId: sessionId,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('🎤 Cry Detection Result:', result);
+        
+        // Update cry detection results
+        setAiResults(prev => ({
+          ...prev,
+          cryDetection: {
+            isCrying: result.is_crying || false,
+            confidence: result.confidence || 0
+          },
+          lastUpdate: new Date()
+        }));
+
+        // Show alert for crying
+        if (result.is_crying && result.confidence > 0.96) {
+          Alert.alert(
+            '🔊 Baby Crying Detected',
+            `Confidence: ${(result.confidence * 100).toFixed(1)}%`,
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('❌ AI service error (audio):', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('❌ Audio analysis error:', error);
+    }
+  };
+
   const startAIAnalysis = () => {
     // Clear any existing interval
     if (analysisIntervalRef.current) {
       clearInterval(analysisIntervalRef.current);
+    }
+    if (audioAnalysisIntervalRef.current) {
+      clearInterval(audioAnalysisIntervalRef.current);
     }
 
     // Start periodic frame analysis (every 2 seconds)
@@ -212,8 +304,14 @@ export default function MonitoringScreen() {
       captureAndAnalyzeFrame();
     }, 2000);
 
+    // Start periodic audio analysis (every 3 seconds - matches audio clip duration)
+    audioAnalysisIntervalRef.current = setInterval(() => {
+      captureAndAnalyzeAudio();
+    }, 3000);
+
     // First analysis immediately
     setTimeout(() => captureAndAnalyzeFrame(), 1000);
+    setTimeout(() => captureAndAnalyzeAudio(), 1500);
   };
 
   const stopAIAnalysis = () => {
@@ -222,22 +320,34 @@ export default function MonitoringScreen() {
       analysisIntervalRef.current = null;
     }
     
+    if (audioAnalysisIntervalRef.current) {
+      clearInterval(audioAnalysisIntervalRef.current);
+      audioAnalysisIntervalRef.current = null;
+    }
+    
     // Reset AI results
     setAiResults({
+      awakeSleep: {
+        state: 'unknown',
+        confidence: 0,
+        success: false
+      },
       sleepSafety: {
         isSafe: null,
         confidence: 0,
-        alertLevel: 'normal',
         position: 'unknown',
-        status: null,
+        success: false,
         message: ''
+      },
+      overallSafety: {
+        level: 'unknown',
+        message: '',
+        alert: false,
+        confidence: 0
       },
       cryDetection: {
         isCrying: false,
-        cryProbability: 0,
-        cryReason: null,
-        reasonConfidence: 0,
-        recommendations: []
+        confidence: 0
       },
       lastUpdate: null
     });
@@ -473,51 +583,126 @@ export default function MonitoringScreen() {
           <View style={styles.aiResultsContainer}>
             <Text style={styles.aiResultsTitle}>🤖 Live AI Analysis</Text>
             
-            {/* Sleep Safety Status */}
+            {/* Overall Safety Status */}
             <View style={[
               styles.aiResultCard,
-              { borderLeftColor: aiResults.sleepSafety.status === 'no_detection' ? '#FF9800' : 
-                                 aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336' }
+              { borderLeftColor: aiResults.overallSafety.level === 'safe' ? '#4CAF50' : 
+                                 aiResults.overallSafety.level === 'critical' ? '#F44336' : 
+                                 aiResults.overallSafety.level === 'warning' ? '#FF9800' : '#999' }
+            ]}>
+              <View style={styles.aiResultHeader}>
+                <Ionicons 
+                  name="shield-checkmark" 
+                  size={24} 
+                  color={aiResults.overallSafety.level === 'safe' ? '#4CAF50' : 
+                         aiResults.overallSafety.level === 'critical' ? '#F44336' : 
+                         aiResults.overallSafety.level === 'warning' ? '#FF9800' : '#999'} 
+                />
+                <Text style={styles.aiResultTitle}>Overall Safety Status</Text>
+              </View>
+              
+              <View style={styles.aiResultContent}>
+                <Text style={[
+                  styles.aiResultStatus,
+                  { color: aiResults.overallSafety.level === 'safe' ? '#4CAF50' : 
+                           aiResults.overallSafety.level === 'critical' ? '#F44336' : 
+                           aiResults.overallSafety.level === 'warning' ? '#FF9800' : '#999' }
+                ]}>
+                  {aiResults.overallSafety.level === 'safe' ? '✅ SAFE' : 
+                   aiResults.overallSafety.level === 'critical' ? '⚠️ CRITICAL ALERT' : 
+                   aiResults.overallSafety.level === 'warning' ? '⚠️ WARNING' : '❓ UNKNOWN'}
+                </Text>
+                
+                <Text style={styles.aiResultMessage}>
+                  {aiResults.overallSafety.message || 'Analyzing...'}
+                </Text>
+                
+                {aiResults.overallSafety.confidence > 0 && (
+                  <View style={styles.aiResultDetails}>
+                    <Text style={styles.aiResultLabel}>Confidence:</Text>
+                    <Text style={styles.aiResultValue}>
+                      {(aiResults.overallSafety.confidence * 100).toFixed(1)}%
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            
+            {/* Awake/Sleep Detection */}
+            <View style={[
+              styles.aiResultCard,
+              { borderLeftColor: aiResults.awakeSleep.state === 'awake' ? '#2196F3' : 
+                                 aiResults.awakeSleep.state === 'asleep' ? '#9C27B0' : '#999' }
+            ]}>
+              <View style={styles.aiResultHeader}>
+                <Ionicons 
+                  name={aiResults.awakeSleep.state === 'awake' ? 'eye' : 
+                        aiResults.awakeSleep.state === 'asleep' ? 'eye-off' : 'eye-outline'} 
+                  size={24} 
+                  color={aiResults.awakeSleep.state === 'awake' ? '#2196F3' : 
+                         aiResults.awakeSleep.state === 'asleep' ? '#9C27B0' : '#999'} 
+                />
+                <Text style={styles.aiResultTitle}>Awake/Sleep State</Text>
+              </View>
+              
+              <View style={styles.aiResultContent}>
+                {aiResults.awakeSleep.success ? (
+                  <>
+                    <Text style={[
+                      styles.aiResultStatus,
+                      { color: aiResults.awakeSleep.state === 'awake' ? '#2196F3' : '#9C27B0' }
+                    ]}>
+                      {aiResults.awakeSleep.state === 'awake' ? '👁️ AWAKE' : '😴 ASLEEP'}
+                    </Text>
+                    
+                    <View style={styles.aiResultDetails}>
+                      <Text style={styles.aiResultLabel}>Confidence:</Text>
+                      <Text style={styles.aiResultValue}>
+                        {(aiResults.awakeSleep.confidence * 100).toFixed(1)}%
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <Text style={[styles.aiResultStatus, { color: '#999' }]}>
+                    ❓ Unable to detect
+                  </Text>
+                )}
+              </View>
+            </View>
+            
+            {/* Sleep Position Detection */}
+            <View style={[
+              styles.aiResultCard,
+              { borderLeftColor: aiResults.sleepSafety.success ? 
+                                 (aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336') : '#999' }
             ]}>
               <View style={styles.aiResultHeader}>
                 <Ionicons 
                   name="bed" 
                   size={24} 
-                  color={aiResults.sleepSafety.status === 'no_detection' ? '#FF9800' : 
-                         aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336'} 
+                  color={aiResults.sleepSafety.success ? 
+                         (aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336') : '#999'} 
                 />
-                <Text style={styles.aiResultTitle}>Sleep Safety</Text>
+                <Text style={styles.aiResultTitle}>Sleeping Position</Text>
               </View>
               
               <View style={styles.aiResultContent}>
-                {aiResults.sleepSafety.status === 'no_detection' ? (
-                  <>
-                    <Text style={[
-                      styles.aiResultStatus,
-                      { color: '#FF9800' }
-                    ]}>
-                      👁️ NO BABY DETECTED
-                    </Text>
-                    <Text style={styles.aiResultMessage}>
-                      {aiResults.sleepSafety.message || 'No baby visible in camera view'}
-                    </Text>
-                    <Text style={styles.aiResultHint}>
-                      💡 Point the camera at the baby to start monitoring
-                    </Text>
-                  </>
-                ) : (
+                {aiResults.sleepSafety.success ? (
                   <>
                     <Text style={[
                       styles.aiResultStatus,
                       { color: aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336' }
                     ]}>
-                      {aiResults.sleepSafety.isSafe ? '✅ SAFE' : '⚠️ UNSAFE'}
+                      {aiResults.sleepSafety.position.toUpperCase()}
                     </Text>
                     
                     <View style={styles.aiResultDetails}>
-                      <Text style={styles.aiResultLabel}>Position:</Text>
-                      <Text style={styles.aiResultValue}>
-                        {aiResults.sleepSafety.position || 'Detecting...'}
+                      <Text style={styles.aiResultLabel}>Safety:</Text>
+                      <Text style={[
+                        styles.aiResultValue,
+                        { color: aiResults.sleepSafety.isSafe ? '#4CAF50' : '#F44336' }
+                      ]}>
+                        {aiResults.sleepSafety.isSafe ? 'Safe ✓' : 'Unsafe ✗'}
                       </Text>
                     </View>
                     
@@ -527,18 +712,11 @@ export default function MonitoringScreen() {
                         {(aiResults.sleepSafety.confidence * 100).toFixed(1)}%
                       </Text>
                     </View>
-                    
-                    <View style={styles.aiResultDetails}>
-                      <Text style={styles.aiResultLabel}>Alert Level:</Text>
-                      <Text style={[
-                        styles.aiResultValue,
-                        { color: aiResults.sleepSafety.alertLevel === 'critical' ? '#F44336' :
-                                 aiResults.sleepSafety.alertLevel === 'warning' ? '#FF9800' : '#4CAF50' }
-                      ]}>
-                        {aiResults.sleepSafety.alertLevel.toUpperCase()}
-                      </Text>
-                    </View>
                   </>
+                ) : (
+                  <Text style={[styles.aiResultStatus, { color: '#999' }]}>
+                    ❓ Unable to detect
+                  </Text>
                 )}
               </View>
             </View>
@@ -565,40 +743,19 @@ export default function MonitoringScreen() {
                   {aiResults.cryDetection.isCrying ? '🔊 CRYING DETECTED' : '✅ No Crying'}
                 </Text>
                 
-                {aiResults.cryDetection.isCrying && aiResults.cryDetection.cryReason && (
-                  <>
-                    <View style={styles.aiResultDetails}>
-                      <Text style={styles.aiResultLabel}>Reason:</Text>
-                      <Text style={styles.aiResultValue}>
-                        {aiResults.cryDetection.cryReason}
-                      </Text>
-                    </View>
-                    
-                    <View style={styles.aiResultDetails}>
-                      <Text style={styles.aiResultLabel}>Confidence:</Text>
-                      <Text style={styles.aiResultValue}>
-                        {(aiResults.cryDetection.reasonConfidence * 100).toFixed(1)}%
-                      </Text>
-                    </View>
-                    
-                    {aiResults.cryDetection.recommendations && 
-                     aiResults.cryDetection.recommendations.length > 0 && (
-                      <View style={styles.recommendationsContainer}>
-                        <Text style={styles.recommendationsTitle}>💡 Recommendations:</Text>
-                        {aiResults.cryDetection.recommendations.map((rec, idx) => (
-                          <Text key={idx} style={styles.recommendationText}>
-                            • {rec}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
-                  </>
+                {aiResults.cryDetection.confidence > 0 && (
+                  <View style={styles.aiResultDetails}>
+                    <Text style={styles.aiResultLabel}>Confidence:</Text>
+                    <Text style={styles.aiResultValue}>
+                      {(aiResults.cryDetection.confidence * 100).toFixed(1)}%
+                    </Text>
+                  </View>
                 )}
               </View>
             </View>
             
             <Text style={styles.lastUpdateText}>
-              Last updated: {new Date(aiResults.lastUpdate).toLocaleTimeString()}
+              Last updated: {aiResults.lastUpdate.toLocaleTimeString()}
             </Text>
           </View>
         )}
@@ -609,16 +766,20 @@ export default function MonitoringScreen() {
             <Text style={styles.featuresTitle}>AI Safety Features</Text>
             <View style={styles.featuresList}>
               <View style={styles.featureItem}>
+                <Ionicons name="eye" size={16} color="#2196F3" />
+                <Text style={styles.featureText}>Awake/Sleep State Detection (Eye Tracking)</Text>
+              </View>
+              <View style={styles.featureItem}>
                 <Ionicons name="bed" size={16} color="#4D96FF" />
-                <Text style={styles.featureText}>Sleep Position Safety Detection</Text>
+                <Text style={styles.featureText}>Sleep Position Safety (Back vs Stomach)</Text>
               </View>
               <View style={styles.featureItem}>
                 <Ionicons name="volume-high" size={16} color="#FF6B6B" />
-                <Text style={styles.featureText}>Cry Detection & Reason Classification</Text>
+                <Text style={styles.featureText}>Cry Detection (Audio Analysis)</Text>
               </View>
               <View style={styles.featureItem}>
                 <Ionicons name="shield-checkmark" size={16} color="#6BCB77" />
-                <Text style={styles.featureText}>Real-time AI Monitoring</Text>
+                <Text style={styles.featureText}>Real-time AI Monitoring with Alerts</Text>
               </View>
             </View>
           </View>
@@ -668,7 +829,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   cameraContainer: {
-    height: 400,  // Fixed height so it doesn't take full screen
+    width: '100%',
+    height: 250,  // Fixed height for better display
     backgroundColor: '#000',
     borderRadius: 12,
     marginBottom: 20,
@@ -677,15 +839,23 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
     width: '100%',
+    height: '100%',
+    position: 'relative',
   },
   webcamStream: {
+    flex: 1,
     width: '100%',
     height: '100%',
     backgroundColor: '#000',
   },
   cameraOverlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'transparent',
+    pointerEvents: 'none',
   },
   recordingIndicator: {
     position: 'absolute',
