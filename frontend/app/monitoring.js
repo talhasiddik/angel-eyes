@@ -131,6 +131,74 @@ export default function MonitoringScreen() {
     }
   };
 
+  // Save detection to backend database
+  const saveDetectionToDatabase = async (aiResult, type = 'safety') => {
+    try {
+      if (!sessionId || !selectedBabyId) {
+        console.log('⚠️ Cannot save detection: missing sessionId or babyId');
+        return;
+      }
+
+      let detectionType, severity, confidence, detectionData;
+
+      if (type === 'cry') {
+        detectionType = 'ExcessiveCrying';
+        severity = aiResult.confidence > 0.9 ? 'High' : 'Medium';
+        confidence = aiResult.confidence;
+        detectionData = {
+          soundType: 'Crying',
+          soundLevel: Math.round(aiResult.confidence * 100)
+        };
+      } else {
+        // Safety detection (sleep position)
+        const safetyLevel = aiResult.safety?.level;
+        
+        if (safetyLevel === 'critical') {
+          detectionType = 'UnsafeSleeping';
+          severity = 'Critical';
+        } else if (safetyLevel === 'warning') {
+          detectionType = 'UnusualPosition';
+          severity = 'High';
+        } else {
+          return; // Don't save safe detections
+        }
+
+        confidence = aiResult.safety?.confidence || 0;
+        detectionData = {
+          bodyPosition: aiResult.sleep_position?.position || 'Unknown',
+          rawData: {
+            awakeSleep: aiResult.awake_sleep,
+            sleepPosition: aiResult.sleep_position,
+            safety: aiResult.safety
+          }
+        };
+      }
+
+      const detectionPayload = {
+        babyId: selectedBabyId,
+        sessionId: sessionId,
+        detectionType,
+        severity,
+        confidence,
+        data: detectionData
+      };
+
+      console.log('💾 Saving detection to database:', detectionPayload);
+
+      const response = await apiClient.request('/detections', {
+        method: 'POST',
+        body: detectionPayload
+      });
+
+      if (response.success) {
+        console.log('✅ Detection saved:', response.data.detection.id);
+      }
+    } catch (error) {
+      console.error('❌ Failed to save detection:', error);
+      // Don't show alert to user, just log the error
+    }
+  };
+
   // AI Analysis Functions
   const captureAndAnalyzeFrame = async () => {
     if (isAnalyzing) return;
@@ -143,6 +211,7 @@ export default function MonitoringScreen() {
       
       if (!snapshotResponse.ok) {
         console.log('❌ Failed to get webcam snapshot');
+        setIsAnalyzing(false);
         return;
       }
 
@@ -159,6 +228,7 @@ export default function MonitoringScreen() {
 
       if (!base64) {
         console.log('❌ No base64 image data');
+        setIsAnalyzing(false);
         return;
       }
 
@@ -207,6 +277,11 @@ export default function MonitoringScreen() {
           },
           lastUpdate: new Date()
         }));
+
+        // Save critical or warning detections to database
+        if (result.safety?.alert && (result.safety?.level === 'critical' || result.safety?.level === 'warning')) {
+          await saveDetectionToDatabase(result);
+        }
 
         // Show alert for critical safety issues
         if (result.safety?.alert && result.safety?.level === 'critical') {
@@ -272,6 +347,11 @@ export default function MonitoringScreen() {
           },
           lastUpdate: new Date()
         }));
+
+        // Save excessive crying to database
+        if (result.is_crying && result.confidence > 0.7) {
+          await saveDetectionToDatabase(result, 'cry');
+        }
 
         // Show alert for crying
         if (result.is_crying && result.confidence > 0.96) {

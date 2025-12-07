@@ -25,46 +25,6 @@ export default function DetectionsScreen() {
   const [selectedBabyId, setSelectedBabyId] = useState(null);
   const [babyName, setBabyName] = useState('');
 
-  // Sample detection data - replace with API calls
-  const sampleDetections = [
-    {
-      _id: '1',
-      type: 'choking_risk',
-      severity: 'critical',
-      message: 'Potential choking detected - immediate attention required',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      resolved: false,
-      confidence: 0.95,
-    },
-    {
-      _id: '2',
-      type: 'unsafe_sleep',
-      severity: 'warning',
-      message: 'Baby detected in unsafe sleep position',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      resolved: true,
-      confidence: 0.87,
-    },
-    {
-      _id: '3',
-      type: 'crying_detected',
-      severity: 'info',
-      message: 'Continuous crying detected for 5 minutes',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-      resolved: true,
-      confidence: 0.92,
-    },
-    {
-      _id: '4',
-      type: 'movement_anomaly',
-      severity: 'warning',
-      message: 'Unusual movement pattern detected',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-      resolved: true,
-      confidence: 0.78,
-    },
-  ];
-
   useEffect(() => {
     loadSelectedBaby();
   }, []);
@@ -100,16 +60,48 @@ export default function DetectionsScreen() {
   const loadDetections = async (babyId) => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call that uses babyId
-      // const response = await apiClient.getDetections(babyId);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      setDetections(sampleDetections);
+      const response = await apiClient.getDetections({ babyId, limit: 50 });
+      
+      if (response.success) {
+        // Transform backend data to match frontend format
+        const transformedDetections = response.data.detections.map(det => ({
+          _id: det.id,
+          type: det.detectionType,
+          severity: det.severity.toLowerCase(),
+          message: getDetectionMessage(det.detectionType, det.severity),
+          timestamp: new Date(det.timestamp),
+          resolved: det.status === 'Resolved',
+          confidence: det.confidence,
+          data: det.data,
+          resolvedBy: det.resolvedBy,
+          resolvedAt: det.resolvedAt
+        }));
+        
+        setDetections(transformedDetections);
+      }
     } catch (error) {
       console.error('Failed to load detections:', error);
       Alert.alert('Error', 'Failed to load detections');
+      setDetections([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
+  };
+
+  const getDetectionMessage = (type, severity) => {
+    const messages = {
+      'Choking': 'Potential choking detected - immediate attention required',
+      'UnsafeSleeping': 'Baby detected in unsafe sleep position',
+      'ExcessiveCrying': 'Continuous crying detected',
+      'MotionDetection': 'Unusual movement pattern detected',
+      'SoundDetection': 'Unusual sound detected',
+      'TemperatureAnomaly': 'Temperature anomaly detected',
+      'FallDetection': 'Potential fall detected',
+      'UnusualPosition': 'Baby in unusual position',
+      'NoMovement': 'No movement detected for extended period'
+    };
+    
+    return messages[type] || `${type} detected`;
   };
 
   const onRefresh = async () => {
@@ -122,6 +114,7 @@ export default function DetectionsScreen() {
 
   const markAsResolved = async (detectionId) => {
     try {
+      // Optimistically update UI
       const updatedDetections = detections.map(detection => {
         if (detection._id === detectionId) {
           return { ...detection, resolved: true };
@@ -130,22 +123,33 @@ export default function DetectionsScreen() {
       });
       setDetections(updatedDetections);
       
-      // TODO: Update on backend
-      // await apiClient.resolveDetection(detectionId);
+      // Update on backend
+      await apiClient.resolveDetection(detectionId, 'Resolved by parent');
     } catch (error) {
       console.error('Failed to resolve detection:', error);
       Alert.alert('Error', 'Failed to resolve detection');
+      // Reload detections to restore correct state
+      if (selectedBabyId) {
+        loadDetections(selectedBabyId);
+      }
     }
   };
 
   const getDetectionIcon = (type) => {
-    switch (type) {
-      case 'choking_risk': return 'warning';
-      case 'unsafe_sleep': return 'bed';
-      case 'crying_detected': return 'volume-high';
-      case 'movement_anomaly': return 'body';
-      default: return 'alert-circle';
-    }
+    const icons = {
+      'Choking': 'warning',
+      'UnsafeSleeping': 'bed',
+      'ExcessiveCrying': 'volume-high',
+      'MotionDetection': 'body',
+      'SoundDetection': 'musical-notes',
+      'TemperatureAnomaly': 'thermometer',
+      'FallDetection': 'arrow-down-circle',
+      'UnusualPosition': 'person',
+      'NoMovement': 'pause-circle',
+      'FaceRecognition': 'eye'
+    };
+    
+    return icons[type] || 'alert-circle';
   };
 
   const getSeverityColor = (severity) => {
@@ -316,11 +320,51 @@ export default function DetectionsScreen() {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="shield-checkmark" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>No {filter === 'all' ? '' : filter} detections</Text>
-            <Text style={styles.emptySubtext}>All clear! Your baby is safe.</Text>
-          </View>
+          !loading && (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="shield-checkmark-outline" size={80} color="#4CAF50" />
+              </View>
+              <Text style={styles.emptyTitle}>
+                {filter === 'all' ? 'No Detections Yet' : `No ${filter.charAt(0).toUpperCase() + filter.slice(1)} Detections`}
+              </Text>
+              <Text style={styles.emptyText}>
+                {filter === 'all' 
+                  ? "All clear! Your baby's monitoring session hasn't detected any safety concerns yet."
+                  : `No ${filter} alerts found. Great news!`}
+              </Text>
+              
+              <View style={styles.emptyFeaturesContainer}>
+                <Text style={styles.emptyFeaturesTitle}>AI monitors for:</Text>
+                <View style={styles.emptyFeaturesList}>
+                  <View style={styles.emptyFeatureItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                    <Text style={styles.emptyFeatureText}>Sleep position safety</Text>
+                  </View>
+                  <View style={styles.emptyFeatureItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                    <Text style={styles.emptyFeatureText}>Excessive crying</Text>
+                  </View>
+                  <View style={styles.emptyFeatureItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                    <Text style={styles.emptyFeatureText}>Unusual movements</Text>
+                  </View>
+                  <View style={styles.emptyFeatureItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                    <Text style={styles.emptyFeatureText}>Sound anomalies</Text>
+                  </View>
+                </View>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.emptyActionButton}
+                onPress={() => router.push('/monitoring')}
+              >
+                <Ionicons name="play-circle" size={24} color="#fff" />
+                <Text style={styles.emptyActionText}>Start Monitoring</Text>
+              </TouchableOpacity>
+            </View>
+          )
         }
       />
     </SafeAreaView>
@@ -494,16 +538,80 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 40,
+    paddingHorizontal: 24,
+  },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
     color: '#666',
-    marginTop: 16,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
   },
   emptySubtext: {
     fontSize: 14,
     color: '#999',
     marginTop: 8,
+  },
+  emptyFeaturesContainer: {
+    width: '100%',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+  },
+  emptyFeaturesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#512da8',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  emptyFeaturesList: {
+    gap: 12,
+  },
+  emptyFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  emptyFeatureText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 12,
+  },
+  emptyActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  emptyActionText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });
