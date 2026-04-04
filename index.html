@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angel Eyes | AI-Powered Baby Safety Monitor</title>
+    <meta name="description" content="Angel Eyes is an AI-powered baby monitoring application using real-time computer vision to detect potential safety risks and provide intelligent alerts to parents.">
+    <link rel="icon" type="image/png" href="frontend/assets/logo/7.png">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-purple: #7B2CBF;
+            --primary-teal: #2DD4BF;
+            --dark-purple: #5A189A;
+            --light-purple: #E0AAFF;
+            --dark-gray: #1a1a2e;
+            --light-gray: #f8f9fa;
+            --white: #ffffff;
+            --coral: #FF6B6B;
+            --mint: #6BCB77;
+            --sky: #4D96FF;
+            --yellow: #FFD93D;
+            --gradient-primary: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-teal) 100%);
+            --gradient-dark: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --shadow-soft: 0 10px 40px rgba(123, 44, 191, 0.15);
+            --shadow-hard: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--light-gray);
+            color: var(--dark-gray);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 1rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+
+        nav.scrolled {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--white);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        nav.scrolled .nav-logo {
+            color: var(--primary-purple);
+        }
+
+        .nav-logo img {
+            height: 45px;
+            width: auto;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--white);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        nav.scrolled .nav-links a {
+            color: var(--dark-gray);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--primary-teal);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        .nav-cta {
+            padding: 0.6rem 1.5rem;
+            background: var(--primary-teal);
+            color: var(--dark-gray) !important;
+            border-radius: 50px;
+            font-weight: 600;
+        }
+
+        .nav-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(45, 212, 191, 0.4);
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            background: var(--gradient-dark);
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 0 5%;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="%237B2CBF" stroke-width="0.5" opacity="0.1"/><circle cx="50" cy="50" r="30" fill="none" stroke="%232DD4BF" stroke-width="0.3" opacity="0.1"/></svg>');
+            background-size: 200px;
+            animation: float 20s linear infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100px) rotate(10deg); }
+        }
+
+        .hero-content {
+            max-width: 600px;
+            z-index: 10;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(123, 44, 191, 0.2);
+            border: 1px solid var(--primary-purple);
+            border-radius: 50px;
+            color: var(--light-purple);
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero-badge i {
+            color: var(--primary-teal);
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: var(--white);
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero h1 span {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: #a0a0b0;
+            margin-bottom: 2rem;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: var(--white);
+            box-shadow: 0 10px 30px rgba(123, 44, 191, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(123, 44, 191, 0.5);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--white);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary-teal);
+        }
+
+        .hero-visual {
+            position: absolute;
+            right: 5%;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 45%;
+            max-width: 600px;
+        }
+
+        .hero-mockup {
+            position: relative;
+        }
+
+        .phone-frame {
+            width: 280px;
+            height: 580px;
+            background: #1a1a2e;
+            border-radius: 40px;
+            padding: 10px;
+            box-shadow: var(--shadow-hard);
+            margin: 0 auto;
+            position: relative;
+            border: 3px solid #333;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #2a2a4a 0%, #1a1a2e 100%);
+            border-radius: 32px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .phone-screen .app-logo {
+            width: 120px;
+            margin-bottom: 20px;
+        }
+
+        .phone-screen h3 {
+            color: var(--white);
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .phone-screen p {
+            color: #888;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+
+        .floating-card {
+            position: absolute;
+            background: var(--white);
+            border-radius: 16px;
+            padding: 1rem;
+            box-shadow: var(--shadow-soft);
+            animation: floatCard 3s ease-in-out infinite;
+        }
+
+        .floating-card.card-1 {
+            top: 10%;
+            left: -60px;
+            animation-delay: 0s;
+        }
+
+        .floating-card.card-2 {
+            bottom: 20%;
+            right: -80px;
+            animation-delay: 1s;
+        }
+
+        .floating-card.card-3 {
+            top: 40%;
+            right: -100px;
+            animation-delay: 2s;
+        }
+
+        @keyframes floatCard {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .floating-card .icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .floating-card h4 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--dark-gray);
+        }
+
+        .floating-card p {
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            background: var(--white);
+            padding: 3rem 5%;
+            display: flex;
+            justify-content: center;
+            gap: 4rem;
+            flex-wrap: wrap;
+            box-shadow: 0 -20px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Section Styles */
+        section {
+            padding: 6rem 5%;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 4rem;
+        }
+
+        .section-label {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            background: rgba(123, 44, 191, 0.1);
+            color: var(--primary-purple);
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark-gray);
+            margin-bottom: 1rem;
+        }
+
+        .section-header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        /* Problem Section */
+        .problem-section {
+            background: var(--white);
+        }
+
+        .problem-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .problem-content h3 {
+            font-size: 2rem;
+            color: var(--dark-gray);
+            margin-bottom: 1.5rem;
+        }
+
+        .problem-content h3 span {
+            color: var(--coral);
+        }
+
+        .problem-list {
+            list-style: none;
+        }
+
+        .problem-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .problem-list .icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .problem-list h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .problem-list p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .solution-visual {
+            position: relative;
+        }
+
+        .solution-card {
+            background: var(--gradient-dark);
+            border-radius: 24px;
+            padding: 3rem;
+            color: var(--white);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .solution-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(123, 44, 191, 0.3) 0%, transparent 70%);
+        }
+
+        .solution-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .solution-card p {
+            color: #a0a0b0;
+            position: relative;
+        }
+
+        .solution-features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 2rem;
+            position: relative;
+        }
+
+        .solution-feature {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .solution-feature i {
+            color: var(--primary-teal);
+            font-size: 1.2rem;
+        }
+
+        .solution-feature span {
+            font-size: 0.95rem;
+        }
+
+        /* Features Section */
+        .features-section {
+            background: var(--light-gray);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: var(--white);
+            border-radius: 20px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-soft);
+            border-color: var(--primary-purple);
+        }
+
+        .feature-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+
+        .feature-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 0.75rem;
+            color: var(--dark-gray);
+        }
+
+        .feature-card p {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .feature-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .feature-tag {
+            padding: 0.3rem 0.75rem;
+            background: rgba(123, 44, 191, 0.1);
+            color: var(--primary-purple);
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* AI Models Section */
+        .ai-section {
+            background: var(--gradient-dark);
+            color: var(--white);
+        }
+
+        .ai-section .section-header h2,
+        .ai-section .section-header p {
+            color: var(--white);
+        }
+
+        .ai-section .section-header p {
+            color: #a0a0b0;
+        }
+
+        .ai-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .ai-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ai-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .ai-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .ai-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-5px);
+        }
+
+        .ai-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2rem;
+        }
+
+        .ai-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .ai-card p {
+            color: #a0a0b0;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .ai-specs {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .ai-spec {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.85rem;
+        }
+
+        .ai-spec-label {
+            color: #888;
+        }
+
+        .ai-spec-value {
+            color: var(--primary-teal);
+            font-weight: 600;
+        }
+
+        /* Tech Stack Section */
+        .tech-section {
+            background: var(--white);
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .tech-category {
+            background: var(--light-gray);
+            border-radius: 20px;
+            padding: 2rem;
+        }
+
+        .tech-category h4 {
+            font-size: 0.9rem;
+            color: var(--primary-purple);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tech-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .tech-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--white);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .tech-item:hover {
+            transform: translateX(5px);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .tech-item i {
+            font-size: 1.5rem;
+            width: 30px;
+            text-align: center;
+        }
+
+        .tech-item span {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        /* Architecture Section */
+        .arch-section {
+            background: var(--light-gray);
+        }
+
+        .arch-diagram {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--white);
+            border-radius: 24px;
+            padding: 3rem;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .arch-node {
+            flex: 1;
+            min-width: 200px;
+            text-align: center;
+            padding: 2rem 1rem;
+            background: var(--light-gray);
+            border-radius: 16px;
+            position: relative;
+        }
+
+        .arch-node::after {
+            content: '→';
+            position: absolute;
+            right: -25px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            color: var(--primary-purple);
+        }
+
+        .arch-node:last-child::after {
+            display: none;
+        }
+
+        .arch-node-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.5rem;
+            color: var(--white);
+        }
+
+        .arch-node h4 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .arch-node p {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .arch-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+            padding-top: 3rem;
+            border-top: 1px solid #eee;
+        }
+
+        .arch-detail {
+            text-align: center;
+        }
+
+        .arch-detail h4 {
+            color: var(--primary-purple);
+            margin-bottom: 0.5rem;
+        }
+
+        .arch-detail p {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Gallery Section */
+        .gallery-section {
+            background: var(--white);
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .gallery-item {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            aspect-ratio: 1;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .gallery-item:hover {
+            transform: scale(1.02);
+            box-shadow: var(--shadow-hard);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+            color: var(--white);
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .gallery-item:hover .gallery-overlay {
+            transform: translateY(0);
+        }
+
+        .gallery-overlay h4 {
+            font-size: 1rem;
+        }
+
+        .gallery-overlay p {
+            font-size: 0.8rem;
+            color: #ccc;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            background: var(--gradient-primary);
+            text-align: center;
+            padding: 6rem 5%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="white" stroke-width="0.2" opacity="0.1"/></svg>');
+            background-size: 100px;
+            animation: rotate 60s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 10;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .cta-section h2 {
+            font-size: 2.5rem;
+            color: var(--white);
+            margin-bottom: 1rem;
+        }
+
+        .cta-section p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-white {
+            background: var(--white);
+            color: var(--primary-purple);
+        }
+
+        .btn-white:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-outline-white {
+            background: transparent;
+            color: var(--white);
+            border: 2px solid var(--white);
+        }
+
+        .btn-outline-white:hover {
+            background: var(--white);
+            color: var(--primary-purple);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--dark-gray);
+            color: var(--white);
+            padding: 4rem 5% 2rem;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 3rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .footer-brand img {
+            height: 50px;
+        }
+
+        .footer-brand span {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .footer-about p {
+            color: #888;
+            font-size: 0.9rem;
+            line-height: 1.8;
+        }
+
+        .footer-column h4 {
+            color: var(--white);
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+        }
+
+        .footer-links {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-links a {
+            color: #888;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--primary-teal);
+        }
+
+        .footer-social {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .footer-social a {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--white);
+            transition: all 0.3s ease;
+        }
+
+        .footer-social a:hover {
+            background: var(--primary-purple);
+            transform: translateY(-3px);
+        }
+
+        .footer-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 3rem;
+            padding-top: 2rem;
+            text-align: center;
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero-visual {
+                display: none;
+            }
+
+            .problem-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ai-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tech-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .arch-flow {
+                flex-direction: column;
+            }
+
+            .arch-node::after {
+                content: '↓';
+                position: absolute;
+                bottom: -25px;
+                right: 50%;
+                transform: translateX(50%);
+            }
+
+            .arch-details {
+                grid-template-columns: 1fr;
+            }
+
+            .gallery-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .stats-bar {
+                gap: 2rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tech-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .gallery-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav id="navbar">
+        <a href="#" class="nav-logo">
+            <img src="frontend/assets/logo/7.png" alt="Angel Eyes Logo">
+            <span>Angel Eyes</span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#ai-models">AI Models</a></li>
+            <li><a href="#tech-stack">Tech Stack</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="https://github.com/talhasiddik/angel-eyes" class="nav-cta" target="_blank"><i class="fab fa-github"></i> View Code</a></li>
+        </ul>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <i class="fas fa-shield-alt"></i>
+                Final Year Project — FAST-NUCES
+            </div>
+            <h1>Keep Your Baby <span>Safe</span> with AI-Powered Monitoring</h1>
+            <p>Angel Eyes uses advanced computer vision and machine learning to detect potential safety risks in real-time, giving parents peace of mind with intelligent alerts and comprehensive baby care tracking.</p>
+            <div class="hero-buttons">
+                <a href="https://github.com/talhasiddik/angel-eyes" class="btn btn-primary" target="_blank">
+                    <i class="fab fa-github"></i> View on GitHub
+                </a>
+                <a href="#features" class="btn btn-secondary">
+                    <i class="fas fa-play"></i> Explore Features
+                </a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="hero-mockup">
+                <div class="phone-frame">
+                    <div class="phone-screen">
+                        <img src="frontend/assets/logo/7.png" alt="Angel Eyes" class="app-logo">
+                        <h3>Angel Eyes</h3>
+                        <p>AI Baby Safety Monitor</p>
+                    </div>
+                </div>
+                <div class="floating-card card-1">
+                    <div class="icon" style="background: rgba(255, 107, 107, 0.15);">
+                        <i class="fas fa-heartbeat" style="color: #FF6B6B;"></i>
+                    </div>
+                    <h4>Live Monitoring</h4>
+                    <p>Real-time safety checks</p>
+                </div>
+                <div class="floating-card card-2">
+                    <div class="icon" style="background: rgba(107, 203, 119, 0.15);">
+                        <i class="fas fa-brain" style="color: #6BCB77;"></i>
+                    </div>
+                    <h4>3 AI Models</h4>
+                    <p>Position, sleep, cry detection</p>
+                </div>
+                <div class="floating-card card-3">
+                    <div class="icon" style="background: rgba(77, 150, 255, 0.15);">
+                        <i class="fas fa-bell" style="color: #4D96FF;"></i>
+                    </div>
+                    <h4>Instant Alerts</h4>
+                    <p>Push notifications</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat-item">
+            <div class="stat-number">3</div>
+            <div class="stat-label">AI Models Integrated</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">142</div>
+            <div class="stat-label">Engineered Features</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">2s</div>
+            <div class="stat-label">Detection Interval</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">6</div>
+            <div class="stat-label">Cry Reasons Classified</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">100%</div>
+            <div class="stat-label">Production Ready</div>
+        </div>
+    </div>
+
+    <!-- Problem/Solution Section -->
+    <section class="problem-section" id="problem">
+        <div class="problem-grid">
+            <div class="problem-content fade-in">
+                <span class="section-label">The Problem</span>
+                <h3>Every parent worries about <span>SIDS</span> and baby safety</h3>
+                <ul class="problem-list">
+                    <li>
+                        <div class="icon" style="background: rgba(255, 107, 107, 0.15);">
+                            <i class="fas fa-exclamation-triangle" style="color: #FF6B6B;"></i>
+                        </div>
+                        <div>
+                            <h4>Sleep Position Risks</h4>
+                            <p>Babies sleeping on their stomach or side face higher SIDS risk, but constant monitoring is exhausting.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="icon" style="background: rgba(255, 217, 61, 0.15);">
+                            <i class="fas fa-tired" style="color: #FFD93D;"></i>
+                        </div>
+                        <div>
+                            <h4>Parent Exhaustion</h4>
+                            <p>New parents can't watch their baby 24/7, leading to anxiety and sleep deprivation.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="icon" style="background: rgba(77, 150, 255, 0.15);">
+                            <i class="fas fa-question-circle" style="color: #4D96FF;"></i>
+                        </div>
+                        <div>
+                            <h4>Understanding Cries</h4>
+                            <p>Decoding why a baby is crying is challenging, especially for first-time parents.</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="solution-visual fade-in">
+                <div class="solution-card">
+                    <h3>✨ Angel Eyes Solution</h3>
+                    <p>An intelligent guardian that watches over your baby using cutting-edge AI, providing real-time alerts and insights.</p>
+                    <div class="solution-features">
+                        <div class="solution-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Real-time pose detection</span>
+                        </div>
+                        <div class="solution-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Sleep/awake monitoring</span>
+                        </div>
+                        <div class="solution-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Cry reason analysis</span>
+                        </div>
+                        <div class="solution-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Instant push alerts</span>
+                        </div>
+                        <div class="solution-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Routine tracking</span>
+                        </div>
+                        <div class="solution-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Parent community</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section" id="features">
+        <div class="section-header fade-in">
+            <span class="section-label">Features</span>
+            <h2>Everything Parents Need</h2>
+            <p>A comprehensive suite of features designed to give parents peace of mind and simplify baby care.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <img src="frontend/live-monitoring.png" alt="Live Monitoring">
+                </div>
+                <h3>Live Safety Monitoring</h3>
+                <p>Real-time video analysis using computer vision to continuously assess your baby's safety status and sleeping position.</p>
+                <div class="feature-tags">
+                    <span class="feature-tag">Real-time</span>
+                    <span class="feature-tag">Computer Vision</span>
+                    <span class="feature-tag">MediaPipe</span>
+                </div>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <img src="frontend/detections.png" alt="Detections">
+                </div>
+                <h3>Smart Detection Alerts</h3>
+                <p>Intelligent alert system with severity levels (Normal, Warning, Critical) and confidence-based notifications.</p>
+                <div class="feature-tags">
+                    <span class="feature-tag">Push Notifications</span>
+                    <span class="feature-tag">Firebase</span>
+                    <span class="feature-tag">Smart Alerts</span>
+                </div>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <img src="frontend/track-routine.png" alt="Track Routine">
+                </div>
+                <h3>Routine Tracking</h3>
+                <p>Track feeding, sleeping, diaper changes, medicine, and activities with scheduled reminders and progress statistics.</p>
+                <div class="feature-tags">
+                    <span class="feature-tag">Daily Tracking</span>
+                    <span class="feature-tag">Reminders</span>
+                    <span class="feature-tag">Statistics</span>
+                </div>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <img src="frontend/community.png" alt="Community">
+                </div>
+                <h3>Parent Community</h3>
+                <p>Connect with other parents through discussion forums, share experiences, and get advice across 8 categories.</p>
+                <div class="feature-tags">
+                    <span class="feature-tag">Forums</span>
+                    <span class="feature-tag">8 Categories</span>
+                    <span class="feature-tag">Social</span>
+                </div>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon" style="background: linear-gradient(135deg, #FF6B6B 0%, #FFD93D 100%); display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-baby" style="font-size: 2rem; color: white;"></i>
+                </div>
+                <h3>Baby Profile Management</h3>
+                <p>Create and manage multiple baby profiles with health records, medical information, and milestone tracking.</p>
+                <div class="feature-tags">
+                    <span class="feature-tag">Multi-baby</span>
+                    <span class="feature-tag">Health Records</span>
+                    <span class="feature-tag">Milestones</span>
+                </div>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon" style="background: linear-gradient(135deg, #7B2CBF 0%, #2DD4BF 100%); display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-shield-alt" style="font-size: 2rem; color: white;"></i>
+                </div>
+                <h3>Secure Authentication</h3>
+                <p>JWT-based authentication with role-based access control, ensuring your family data stays private and secure.</p>
+                <div class="feature-tags">
+                    <span class="feature-tag">JWT Auth</span>
+                    <span class="feature-tag">RBAC</span>
+                    <span class="feature-tag">Encrypted</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Models Section -->
+    <section class="ai-section" id="ai-models">
+        <div class="section-header fade-in">
+            <span class="section-label" style="background: rgba(45, 212, 191, 0.2); color: var(--primary-teal);">Artificial Intelligence</span>
+            <h2>Powered by 3 ML Models</h2>
+            <p>Advanced machine learning models working together to provide comprehensive safety monitoring.</p>
+        </div>
+        <div class="ai-grid">
+            <div class="ai-card fade-in">
+                <div class="ai-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <h3>Sleep Position Detector</h3>
+                <p>Analyzes baby's body posture to detect safe (back) vs unsafe (stomach/side) sleeping positions using pose estimation.</p>
+                <div class="ai-specs">
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Model</span>
+                        <span class="ai-spec-value">RandomForest</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Features</span>
+                        <span class="ai-spec-value">142 Engineered</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Landmarks</span>
+                        <span class="ai-spec-value">33 Pose Points</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Backend</span>
+                        <span class="ai-spec-value">MediaPipe + sklearn</span>
+                    </div>
+                </div>
+            </div>
+            <div class="ai-card fade-in">
+                <div class="ai-icon">
+                    <i class="fas fa-eye"></i>
+                </div>
+                <h3>Awake/Sleep Detector</h3>
+                <p>Monitors eye region to determine if the baby is awake or asleep using deep learning image classification.</p>
+                <div class="ai-specs">
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Model</span>
+                        <span class="ai-spec-value">MobileNetV2 CNN</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Input</span>
+                        <span class="ai-spec-value">64×64×3 Images</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Classes</span>
+                        <span class="ai-spec-value">Awake / Asleep</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Backend</span>
+                        <span class="ai-spec-value">TensorFlow + Keras 3</span>
+                    </div>
+                </div>
+            </div>
+            <div class="ai-card fade-in">
+                <div class="ai-icon">
+                    <i class="fas fa-volume-up"></i>
+                </div>
+                <h3>Cry Detection & Analysis</h3>
+                <p>Two-stage system: first detects if baby is crying, then classifies the reason with actionable recommendations.</p>
+                <div class="ai-specs">
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Stage 1</span>
+                        <span class="ai-spec-value">Binary CNN</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Stage 2</span>
+                        <span class="ai-spec-value">6-Class Classifier</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Reasons</span>
+                        <span class="ai-spec-value">Hungry, Tired, Pain...</span>
+                    </div>
+                    <div class="ai-spec">
+                        <span class="ai-spec-label">Backend</span>
+                        <span class="ai-spec-value">librosa + TensorFlow</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack Section -->
+    <section class="tech-section" id="tech-stack">
+        <div class="section-header fade-in">
+            <span class="section-label">Technology</span>
+            <h2>Built with Modern Tech Stack</h2>
+            <p>Production-ready architecture using industry-standard technologies.</p>
+        </div>
+        <div class="tech-grid">
+            <div class="tech-category fade-in">
+                <h4><i class="fas fa-mobile-alt"></i> Frontend</h4>
+                <div class="tech-list">
+                    <div class="tech-item">
+                        <i class="fab fa-react" style="color: #61DAFB;"></i>
+                        <span>React Native</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-cube" style="color: #000;"></i>
+                        <span>Expo SDK 54</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-route" style="color: #7B2CBF;"></i>
+                        <span>Expo Router</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-plug" style="color: #4D96FF;"></i>
+                        <span>Socket.IO Client</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tech-category fade-in">
+                <h4><i class="fas fa-server"></i> Backend</h4>
+                <div class="tech-list">
+                    <div class="tech-item">
+                        <i class="fab fa-node-js" style="color: #339933;"></i>
+                        <span>Node.js</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-code" style="color: #000;"></i>
+                        <span>Express.js</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-database" style="color: #47A248;"></i>
+                        <span>MongoDB</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-bell" style="color: #FFCA28;"></i>
+                        <span>Firebase Admin</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tech-category fade-in">
+                <h4><i class="fas fa-brain"></i> AI / ML</h4>
+                <div class="tech-list">
+                    <div class="tech-item">
+                        <i class="fab fa-python" style="color: #3776AB;"></i>
+                        <span>Python / Flask</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-cogs" style="color: #FF6F00;"></i>
+                        <span>TensorFlow</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-eye" style="color: #00B4AB;"></i>
+                        <span>MediaPipe</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-chart-line" style="color: #F7931E;"></i>
+                        <span>scikit-learn</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tech-category fade-in">
+                <h4><i class="fas fa-lock"></i> Security</h4>
+                <div class="tech-list">
+                    <div class="tech-item">
+                        <i class="fas fa-key" style="color: #D63AFF;"></i>
+                        <span>JWT Auth</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-shield-alt" style="color: #7B2CBF;"></i>
+                        <span>bcrypt.js</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-hard-hat" style="color: #FFD93D;"></i>
+                        <span>Helmet</span>
+                    </div>
+                    <div class="tech-item">
+                        <i class="fas fa-tachometer-alt" style="color: #FF6B6B;"></i>
+                        <span>Rate Limiting</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section class="arch-section" id="architecture">
+        <div class="section-header fade-in">
+            <span class="section-label">System Design</span>
+            <h2>Scalable Microservices Architecture</h2>
+            <p>Clean separation of concerns with real-time communication capabilities.</p>
+        </div>
+        <div class="arch-diagram fade-in">
+            <div class="arch-flow">
+                <div class="arch-node">
+                    <div class="arch-node-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h4>Mobile App</h4>
+                    <p>React Native + Expo</p>
+                </div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">
+                        <i class="fas fa-exchange-alt"></i>
+                    </div>
+                    <h4>API Gateway</h4>
+                    <p>Express.js + Socket.IO</p>
+                </div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <h4>AI Service</h4>
+                    <p>Flask + ML Models</p>
+                </div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h4>Database</h4>
+                    <p>MongoDB</p>
+                </div>
+            </div>
+            <div class="arch-details">
+                <div class="arch-detail">
+                    <h4>Real-time Processing</h4>
+                    <p>Frames analyzed every 2 seconds with WebSocket updates for instant alerts</p>
+                </div>
+                <div class="arch-detail">
+                    <h4>Stateless AI</h4>
+                    <p>Flask service runs independently, can be scaled horizontally</p>
+                </div>
+                <div class="arch-detail">
+                    <h4>Push Notifications</h4>
+                    <p>Firebase Cloud Messaging for critical safety alerts</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Gallery Section -->
+    <section class="gallery-section" id="gallery">
+        <div class="section-header fade-in">
+            <span class="section-label">Visual Design</span>
+            <h2>App Interface Highlights</h2>
+            <p>Beautiful, intuitive design focused on quick access to critical information.</p>
+        </div>
+        <div class="gallery-grid">
+            <div class="gallery-item fade-in">
+                <img src="frontend/live-monitoring.png" alt="Live Monitoring">
+                <div class="gallery-overlay">
+                    <h4>Live Monitoring</h4>
+                    <p>Real-time safety checks</p>
+                </div>
+            </div>
+            <div class="gallery-item fade-in">
+                <img src="frontend/detections.png" alt="Detections">
+                <div class="gallery-overlay">
+                    <h4>Smart Detections</h4>
+                    <p>AI-powered alerts</p>
+                </div>
+            </div>
+            <div class="gallery-item fade-in">
+                <img src="frontend/track-routine.png" alt="Track Routine">
+                <div class="gallery-overlay">
+                    <h4>Routine Tracking</h4>
+                    <p>Daily activity logging</p>
+                </div>
+            </div>
+            <div class="gallery-item fade-in">
+                <img src="frontend/community.png" alt="Community">
+                <div class="gallery-overlay">
+                    <h4>Parent Community</h4>
+                    <p>Connect & share</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-content fade-in">
+            <h2>Ready to Explore Angel Eyes?</h2>
+            <p>Check out the source code, documentation, and see how AI can help keep babies safe.</p>
+            <div class="cta-buttons">
+                <a href="https://github.com/talhasiddik/angel-eyes" class="btn btn-white" target="_blank">
+                    <i class="fab fa-github"></i> View Repository
+                </a>
+                <a href="https://github.com/talhasiddik/angel-eyes/wiki" class="btn btn-outline-white" target="_blank">
+                    <i class="fas fa-book"></i> Documentation
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-about">
+                <div class="footer-brand">
+                    <img src="frontend/assets/logo/7.png" alt="Angel Eyes">
+                    <span>Angel Eyes</span>
+                </div>
+                <p>An AI-powered baby monitoring application developed as a Final Year Project at FAST-NUCES. Using computer vision and machine learning to help parents keep their babies safe.</p>
+                <div class="footer-social">
+                    <a href="https://github.com/talhasiddik target="_blank"><i class="fab fa-github"></i></a>
+                    <a href="https://linkedin.com/in/talhasiddik" target="_blank"><i class="fab fa-linkedin-in"></i></a>
+                    <a href="mailto:muhammadtalhasiddique2@gmail.com"><i class="fas fa-envelope"></i></a>
+                </div>
+            </div>
+            <div class="footer-column">
+                <h4>Quick Links</h4>
+                <ul class="footer-links">
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#ai-models">AI Models</a></li>
+                    <li><a href="#tech-stack">Tech Stack</a></li>
+                    <li><a href="#architecture">Architecture</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h4>Technologies</h4>
+                <ul class="footer-links">
+                    <li><a href="#">React Native</a></li>
+                    <li><a href="#">TensorFlow</a></li>
+                    <li><a href="#">MediaPipe</a></li>
+                    <li><a href="#">MongoDB</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h4>Resources</h4>
+                <ul class="footer-links">
+                    <li><a href="#">Documentation</a></li>
+                    <li><a href="#">API Reference</a></li>
+                    <li><a href="#">Source Code</a></li>
+                    <li><a href="#">Contact</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2024 Angel Eyes. Final Year Project — FAST-NUCES. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Navbar scroll effect
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Fade in animations
+        const fadeElements = document.querySelectorAll('.fade-in');
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        fadeElements.forEach(el => observer.observe(el));
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

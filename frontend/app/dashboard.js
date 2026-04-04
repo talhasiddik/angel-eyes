@@ -365,29 +365,29 @@ export default function DashboardScreen() {
             </View>
 
             {/* Dashboard Stats */}
-            {dashboardStats && (
+            {dashboardStats && dashboardStats.statistics && (
               <View style={styles.statsContainer}>
                 <Text style={styles.sectionTitle}>Today's Overview</Text>
                 <View style={styles.statsGrid}>
                   <View style={styles.statCard}>
                     <Ionicons name="videocam" size={24} color="#FF6B6B" />
-                    <Text style={styles.statValue}>{dashboardStats.todaySessionsCount || 0}</Text>
-                    <Text style={styles.statLabel}>Sessions</Text>
+                    <Text style={styles.statValue}>{dashboardStats.statistics.activeSessions || 0}</Text>
+                    <Text style={styles.statLabel}>Active Sessions</Text>
                   </View>
                   <View style={styles.statCard}>
                     <Ionicons name="alert-circle" size={24} color="#FFD93D" />
-                    <Text style={styles.statValue}>{dashboardStats.todayDetectionsCount || 0}</Text>
-                    <Text style={styles.statLabel}>Alerts</Text>
+                    <Text style={styles.statValue}>{dashboardStats.statistics.criticalDetections || 0}</Text>
+                    <Text style={styles.statLabel}>Critical Alerts</Text>
                   </View>
                   <View style={styles.statCard}>
-                    <Ionicons name="time" size={24} color="#4D96FF" />
-                    <Text style={styles.statValue}>{dashboardStats.totalMonitoringHours || 0}h</Text>
-                    <Text style={styles.statLabel}>Monitored</Text>
+                    <Ionicons name="notifications" size={24} color="#4D96FF" />
+                    <Text style={styles.statValue}>{dashboardStats.statistics.unreadAlerts || 0}</Text>
+                    <Text style={styles.statLabel}>Unread</Text>
                   </View>
                   <View style={styles.statCard}>
-                    <Ionicons name="calendar" size={24} color="#6BCB77" />
-                    <Text style={styles.statValue}>{dashboardStats.completedRoutines || 0}</Text>
-                    <Text style={styles.statLabel}>Routines</Text>
+                    <Ionicons name="people" size={24} color="#6BCB77" />
+                    <Text style={styles.statValue}>{dashboardStats.statistics.totalBabies || 0}</Text>
+                    <Text style={styles.statLabel}>Babies</Text>
                   </View>
                 </View>
               </View>

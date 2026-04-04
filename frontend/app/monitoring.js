@@ -284,6 +284,18 @@ export default function MonitoringScreen() {
           },
           lastUpdate: new Date()
         }));
+        
+        console.log('📊 AI Results updated:', {
+          awakeSleep: result.awake_sleep?.state,
+          position: result.sleep_position?.position,
+          safety: result.safety?.level,
+          lastUpdate: new Date().toISOString()
+        });
+        
+        console.log('🎨 UI should now show AI results (isMonitoring && aiResults.lastUpdate):', {
+          isMonitoring,
+          hasLastUpdate: true
+        });
 
         // Save critical or warning detections to database
         if (result.safety?.alert && (result.safety?.level === 'critical' || result.safety?.level === 'warning')) {
@@ -848,9 +860,17 @@ export default function MonitoringScreen() {
               </View>
             </View>
             
-            <Text style={styles.lastUpdateText}>
-              Last updated: {aiResults.lastUpdate.toLocaleTimeString()}
-            </Text>
+            {/* Last Update Timestamp - More Visible */}
+            <View style={styles.lastUpdateContainer}>
+              <Ionicons name="time-outline" size={16} color="#4CAF50" />
+              <Text style={styles.lastUpdateText}>
+                Last updated: {aiResults.lastUpdate.toLocaleTimeString()}
+              </Text>
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+            </View>
           </View>
         )}
 
@@ -1158,10 +1178,41 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     lineHeight: 18,
   },
+  lastUpdateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 20,
+  },
   lastUpdateText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 8,
+    fontSize: 13,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginLeft: 6,
+    marginRight: 12,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
+    marginRight: 4,
+  },
+  liveText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
