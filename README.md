@@ -617,7 +617,6 @@ We welcome contributions! Here's how you can help:
 <br/><br/>
 <b>🗄️ Data, Backend & AI Lead</b>
 <br/><br/>
-• Data Collection & Preprocessing<br/>
 • Backend Development & Optimization<br/>
 • AI Integration & Model Deployment<br/>
 • Privacy & Security
