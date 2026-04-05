@@ -409,7 +409,7 @@ Every 2 Seconds:
 #### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/angel-eyes.git
+git clone https://github.com/talhasiddik/angel-eyes.git
 cd angel-eyes
 ```
 
@@ -612,7 +612,7 @@ We welcome contributions! Here's how you can help:
 <br />
 <sub><b>Your Name</b></sub>
 <br />
-<a href="https://github.com/yourusername">@yourusername</a>
+<a href="https://github.com/talhasiddik">@yourusername</a>
 </td>
 <!-- Add more team members here -->
 </tr>
