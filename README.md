@@ -605,16 +605,43 @@ We welcome contributions! Here's how you can help:
 
 ## 👥 Team
 
+<p align="center">
+  <img src="1766143759234.jpg" alt="Angel Eyes Team" width="600" style="border-radius: 12px;"/>
+</p>
+
 <table>
 <tr>
-<td align="center">
-<img src="https://via.placeholder.com/100" width="100px;" alt="Developer"/>
-<br />
-<sub><b>Your Name</b></sub>
-<br />
-<a href="https://github.com/talhasiddik">@yourusername</a>
+<td align="center" width="33%">
+<h3>M. Talha Siddique</h3>
+<sub><b>21I-0462</b></sub>
+<br/><br/>
+<b>🗄️ Data, Backend & AI Lead</b>
+<br/><br/>
+• Data Collection & Preprocessing<br/>
+• Backend Development & Optimization<br/>
+• AI Integration & Model Deployment<br/>
+• Privacy & Security
 </td>
-<!-- Add more team members here -->
+<td align="center" width="33%">
+<h3>Abdul Moiz</h3>
+<sub><b>21I-0457</b></sub>
+<br/><br/>
+<b>📱 Frontend & Security Lead</b>
+<br/><br/>
+• Health & Routine Tracking<br/>
+• Frontend Development<br/>
+• Deployment & Testing
+</td>
+<td align="center" width="33%">
+<h3>Talha Muazzam</h3>
+<sub><b>21I-2536</b></sub>
+<br/><br/>
+<b>🤖 AI & Community Lead</b>
+<br/><br/>
+• Parental Support & Community<br/>
+• AI Processing & Integration<br/>
+• AI Monitoring
+</td>
 </tr>
 </table>
 
